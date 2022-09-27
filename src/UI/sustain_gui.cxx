@@ -3,16 +3,16 @@
 #include "sustain_gui.h"
 
 void SustainGui::cb_sus_activar_i(RKR_Light_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
         {
-         rgui->getMIDIControl(116);
-         o->value(rkr->Sustainer_Bypass);
+         m_parent->getMIDIControl(MC_Multi_On_Off);
+         o->value(m_process->EFX_Active[EFX_SUSTAINER]);
          return;
         }
-        rkr->Sustainer_Bypass=(int)o->value();
+        m_process->EFX_Active[EFX_SUSTAINER]=(int)o->value();
         if((int) o->value()==0)
-        rkr->efx_Sustainer->cleanup();
-        rgui->findpos(36,(int)o->value(),o);
+        m_process->Rack_Effects[EFX_SUSTAINER]->cleanup();
+        m_parent->findpos(EFX_SUSTAINER,(int)o->value(),o);
 }
 void SustainGui::cb_sus_activar(RKR_Light_Button* o, void* v) {
   ((SustainGui*)(o->parent()))->cb_sus_activar_i(o,v);
@@ -20,9 +20,13 @@ void SustainGui::cb_sus_activar(RKR_Light_Button* o, void* v) {
 
 void SustainGui::cb_sus_preset_i(RKR_Choice* o, void* v) {
   long long ud= (long long) v;
-        if((ud==0)||(ud==12036))rkr->efx_Sustainer->setpreset((int) o->value());
-sus_gain->value(rkr->efx_Sustainer->getpar(0));
-sus_sus->value(rkr->efx_Sustainer->getpar(1));
+if((ud==0)||(ud==UD_PRESET_SUSTAINER))
+    m_process->Rack_Effects[EFX_SUSTAINER]->setpreset((int) o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_SUSTAINER]; i++)
+{
+    parameter_refresh(i);
+};
 }
 void SustainGui::cb_sus_preset(RKR_Choice* o, void* v) {
   ((SustainGui*)(o->parent()))->cb_sus_preset_i(o,v);
@@ -36,36 +40,40 @@ Fl_Menu_Item SustainGui::menu_sus_preset[] = {
 };
 
 void SustainGui::cb_sus_gain_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(312);
+ m_parent->getMIDIControl(MC_Sustain_Gain);
  return;
 }
-rkr->efx_Sustainer->changepar(0,(int)o->value());
+m_process->Rack_Effects[EFX_SUSTAINER]->changepar(Sustain_Gain,(int)o->value());
 }
 void SustainGui::cb_sus_gain(RKR_Slider* o, void* v) {
   ((SustainGui*)(o->parent()))->cb_sus_gain_i(o,v);
 }
 
 void SustainGui::cb_sus_sus_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(313);
+ m_parent->getMIDIControl(MC_Sustain_Sustain);
  return;
 }
-rkr->efx_Sustainer->changepar(1,(int)o->value());
+m_process->Rack_Effects[EFX_SUSTAINER]->changepar(Sustain_Sustain,(int)o->value());
 }
 void SustainGui::cb_sus_sus(RKR_Slider* o, void* v) {
   ((SustainGui*)(o->parent()))->cb_sus_sus_i(o,v);
 }
 SustainGui::SustainGui(int X, int Y, int W, int H, const char *L)
-  : Fl_Group(0, 0, W, H, L) {
+  : RKR_Gui_Effect(0, 0, W, H, L) {
 this->box(FL_UP_BOX);
 this->color(FL_FOREGROUND_COLOR);
 this->selection_color(FL_FOREGROUND_COLOR);
-this->user_data((void*)(1));
+this->labeltype(FL_NO_LABEL);
+this->labelfont(0);
+this->labelsize(14);
+this->labelcolor(FL_FOREGROUND_COLOR);
 this->align(Fl_Align(96|FL_ALIGN_INSIDE));
-{ sus_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
+this->when(FL_WHEN_RELEASE);
+{ RKR_Light_Button* o = sus_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
   sus_activar->box(FL_UP_BOX);
   sus_activar->shortcut(0x31);
   sus_activar->color((Fl_Color)62);
@@ -74,11 +82,12 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   sus_activar->labelfont(0);
   sus_activar->labelsize(10);
   sus_activar->labelcolor(FL_FOREGROUND_COLOR);
-  sus_activar->callback((Fl_Callback*)cb_sus_activar, (void*)(2));
+  sus_activar->callback((Fl_Callback*)cb_sus_activar);
   sus_activar->align(Fl_Align(68|FL_ALIGN_INSIDE));
   sus_activar->when(FL_WHEN_CHANGED);
+  activate_effect = o;
 } // RKR_Light_Button* sus_activar
-{ sus_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
+{ RKR_Choice* o = sus_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
   sus_preset->box(FL_FLAT_BOX);
   sus_preset->down_box(FL_BORDER_BOX);
   sus_preset->color(FL_BACKGROUND_COLOR);
@@ -89,12 +98,13 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   sus_preset->labelcolor(FL_BACKGROUND2_COLOR);
   sus_preset->textsize(10);
   sus_preset->textcolor(FL_BACKGROUND2_COLOR);
-  sus_preset->callback((Fl_Callback*)cb_sus_preset, (void*)(12036));
+  sus_preset->callback((Fl_Callback*)cb_sus_preset, (void*)(UD_PRESET_SUSTAINER));
   sus_preset->align(Fl_Align(FL_ALIGN_LEFT));
   sus_preset->when(FL_WHEN_RELEASE_ALWAYS);
   sus_preset->menu(menu_sus_preset);
+  preset_choice = o;
 } // RKR_Choice* sus_preset
-{ sus_gain = new RKR_Slider(53, 60, 100, 10, "Gain");
+{ sus_gain = new RKR_Slider(56, 60, 100, 10, "Gain");
   sus_gain->type(5);
   sus_gain->box(FL_FLAT_BOX);
   sus_gain->color((Fl_Color)178);
@@ -110,7 +120,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   sus_gain->align(Fl_Align(FL_ALIGN_LEFT));
   sus_gain->when(FL_WHEN_CHANGED);
 } // RKR_Slider* sus_gain
-{ sus_sus = new RKR_Slider(53, 86, 100, 10, "Sustain");
+{ sus_sus = new RKR_Slider(56, 86, 100, 10, "Sustain");
   sus_sus->type(5);
   sus_sus->box(FL_FLAT_BOX);
   sus_sus->color((Fl_Color)178);
@@ -130,4 +140,16 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
 } // RKR_Slider* sus_sus
 position(X, Y);
 end();
+}
+
+void SustainGui::parameter_refresh(int index) {
+  switch (index)
+      {
+      case Sustain_Gain:
+          sus_gain->value(m_process->Rack_Effects[EFX_SUSTAINER]->getpar(Sustain_Gain));
+          break;
+      case Sustain_Sustain:
+          sus_sus->value(m_process->Rack_Effects[EFX_SUSTAINER]->getpar(Sustain_Sustain));
+          break;
+      }
 }

@@ -5,12 +5,12 @@
 #include <FL/Fl.H>
 #include "RKR_Light_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 
-class StompboxGui : public Fl_Group {
+class StompboxGui : public RKR_Gui_Effect {
 public:
   StompboxGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *stomp_activar;
@@ -54,5 +54,7 @@ private:
   inline void cb_stomp_mode_i(RKR_Choice*, void*);
   static void cb_stomp_mode(RKR_Choice*, void*);
   static Fl_Menu_Item menu_stomp_mode[];
+public:
+  void parameter_refresh(int index);
 };
 #endif

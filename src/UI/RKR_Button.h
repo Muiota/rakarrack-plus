@@ -30,7 +30,12 @@
 #include <FL/Fl_Button.H>
 #include <FL/fl_draw.H>
 
-#define BUTTON_USER_DATA   77
+
+#define BUTTON_DEFAULT          0
+#define BUTTON_BANK_HIGHLIGHT   1
+#define BUTTON_MIDI_GET         2
+#define BUTTON_RKR_LABEL        3
+#define BUTTON_BANK_RESET       4
 
 class RKR_Button : public Fl_Button
 {
@@ -43,14 +48,20 @@ public:
     int get_height(){return h();};
     void set_start_width(int W) {m_start_width = W;};
     void set_start_height(int H) {m_start_height = H;};
-    void set_label_offset(int offset){m_label_offset = offset;};
+    void set_label_offset(int offset) {m_label_offset = offset;};
+    void set_button_type(int type) {m_button_type = type;};
+    void set_highlight_preset(int highlight) {m_bank_highlight_preset = highlight;};
+    void set_bank_under_mouse(int mouse) {m_bank_under_mouse = mouse;};
 
 private:
 
     int m_label_offset;
     int m_start_width;
     int m_start_height;
-    int m_previous_font_size;
+    int m_bank_highlight_preset;
+    int m_button_type;
+    int m_look_changed;
+    int m_bank_under_mouse;
 };
 
 #endif /* RKR_BUTTON_H */

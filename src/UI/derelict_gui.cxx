@@ -3,16 +3,16 @@
 #include "derelict_gui.h"
 
 void DerelictGui::cb_derelict_activar_i(RKR_Light_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Derelict_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_DERELICT]);
  return;
 }
-rkr->Derelict_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_DERELICT]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_Derelict->cleanup();
-rgui->findpos(17,(int)o->value(),o);
+m_process->Rack_Effects[EFX_DERELICT]->cleanup();
+m_parent->findpos(EFX_DERELICT,(int)o->value(),o);
 }
 void DerelictGui::cb_derelict_activar(RKR_Light_Button* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_activar_i(o,v);
@@ -20,19 +20,13 @@ void DerelictGui::cb_derelict_activar(RKR_Light_Button* o, void* v) {
 
 void DerelictGui::cb_derelict_preset_i(RKR_Choice* o, void* v) {
   long long ud= (long long) v;
-if((ud==0)||(ud==12017))rkr->efx_Derelict->setpreset((int) o->value());
-derelict_WD->value(Dry_Wet(rkr->efx_Derelict->getpar(0)));
-derelict_LRc->value(rkr->efx_Derelict->getpar(2));
-derelict_drive->value(rkr->efx_Derelict->getpar(3));
-derelict_level->value(rkr->efx_Derelict->getpar(4));
-derelict_tipo->value(rkr->efx_Derelict->getpar(5));
-derelict_neg->value(rkr->efx_Derelict->getpar(6));
-derelict_st->value(rkr->efx_Derelict->getpar(9));
-derelict_oct->value(rkr->efx_Derelict->getpar(11));
-derelict_pan->value(rkr->efx_Derelict->getpar(1)-64);
-derelict_pf->value(rkr->efx_Derelict->getpar(10));
-derelict_lpf->value(rkr->efx_Derelict->getpar(7));
-derelict_hpf->value(rkr->efx_Derelict->getpar(8));
+if((ud==0)||(ud==UD_PRESET_DERELICT))
+    m_process->Rack_Effects[EFX_DERELICT]->setpreset((int) o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_DERELICT]; i++)
+{
+    parameter_refresh(i);
+};
 }
 void DerelictGui::cb_derelict_preset(RKR_Choice* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_preset_i(o,v);
@@ -46,147 +40,151 @@ Fl_Menu_Item DerelictGui::menu_derelict_preset[] = {
 };
 
 void DerelictGui::cb_derelict_WD_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(125);
+ m_parent->getMIDIControl(MC_Dere_DryWet);
  return;
 } 
-rkr->efx_Derelict->changepar(0,Dry_Wet((int)(o->value())));
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_DryWet,Dry_Wet((int)(o->value())));
 }
 void DerelictGui::cb_derelict_WD(RKR_Slider* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_WD_i(o,v);
 }
 
 void DerelictGui::cb_derelict_LRc_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(127);
+ m_parent->getMIDIControl(MC_Dere_LR_Cross);
  return;
 } 
-rkr->efx_Derelict->changepar(2,(int)(o->value()));
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_LR_Cross,(int)(o->value()));
 }
 void DerelictGui::cb_derelict_LRc(RKR_Slider* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_LRc_i(o,v);
 }
 
 void DerelictGui::cb_derelict_drive_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(2);
+ m_parent->getMIDIControl(MC_Dere_Drive);
  return;
 } 
-rkr->efx_Derelict->changepar(3,(int)o->value());
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_Drive,(int)o->value());
 }
 void DerelictGui::cb_derelict_drive(RKR_Slider* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_drive_i(o,v);
 }
 
 void DerelictGui::cb_derelict_level_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(3);
+ m_parent->getMIDIControl(MC_Dere_Level);
  return;
 } 
-rkr->efx_Derelict->changepar(4,(int)o->value());
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_Level,(int)o->value());
 }
 void DerelictGui::cb_derelict_level(RKR_Slider* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_level_i(o,v);
 }
 
 void DerelictGui::cb_derelict_tipo_i(RKR_Choice* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(451);
+ m_parent->getMIDIControl(MC_Dere_Type);
  return;
 } 
 
-rkr->efx_Derelict->changepar(5,(int)o->value());
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_Type,(int)o->value());
 }
 void DerelictGui::cb_derelict_tipo(RKR_Choice* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_tipo_i(o,v);
 }
 
 void DerelictGui::cb_derelict_neg_i(RKR_Check_Button* o, void*) {
-  rkr->efx_Derelict->changepar(6,(int)o->value());
+  m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_Negate,(int)o->value());
 }
 void DerelictGui::cb_derelict_neg(RKR_Check_Button* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_neg_i(o,v);
 }
 
 void DerelictGui::cb_derelict_st_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(6);
+ m_parent->getMIDIControl(MC_Dere_Color);
  return;
 } 
-rkr->efx_Derelict->changepar(9,(int)o->value());
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_Color,(int)o->value());
 }
 void DerelictGui::cb_derelict_st(RKR_Slider* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_st_i(o,v);
 }
 
 void DerelictGui::cb_derelict_oct_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(8);
+ m_parent->getMIDIControl(MC_Dere_Suboctave);
  return;
 } 
-rkr->efx_Derelict->changepar(11,(int)o->value());
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_Suboctave,(int)o->value());
 }
 void DerelictGui::cb_derelict_oct(RKR_Slider* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_oct_i(o,v);
 }
 
 void DerelictGui::cb_derelict_pan_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(126);
+ m_parent->getMIDIControl(MC_Dere_Pan);
  return;
 } 
-rkr->efx_Derelict->changepar(1,(int)(o->value()+64));
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_Pan,(int)(o->value()+64));
 }
 void DerelictGui::cb_derelict_pan(RKR_Slider* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_pan_i(o,v);
 }
 
 void DerelictGui::cb_derelict_pf_i(RKR_Check_Button* o, void*) {
-  rkr->efx_Derelict->changepar(10,(int)o->value());
+  m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_Prefilter,(int)o->value());
 }
 void DerelictGui::cb_derelict_pf(RKR_Check_Button* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_pf_i(o,v);
 }
 
 void DerelictGui::cb_derelict_lpf_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(4);
+ m_parent->getMIDIControl(MC_Dere_LPF);
  return;
 } 
-rkr->efx_Derelict->changepar(7,(int)o->value());
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_LPF,(int)o->value());
 }
 void DerelictGui::cb_derelict_lpf(RKR_Slider* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_lpf_i(o,v);
 }
 
 void DerelictGui::cb_derelict_hpf_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(5);
+ m_parent->getMIDIControl(MC_Dere_HPF);
  return;
 } 
-rkr->efx_Derelict->changepar(8,(int)o->value());
+m_process->Rack_Effects[EFX_DERELICT]->changepar(Dere_HPF,(int)o->value());
 }
 void DerelictGui::cb_derelict_hpf(RKR_Slider* o, void* v) {
   ((DerelictGui*)(o->parent()))->cb_derelict_hpf_i(o,v);
 }
 DerelictGui::DerelictGui(int X, int Y, int W, int H, const char *L)
-  : Fl_Group(0, 0, W, H, L) {
+  : RKR_Gui_Effect(0, 0, W, H, L) {
 this->box(FL_UP_BOX);
 this->color(FL_FOREGROUND_COLOR);
 this->selection_color(FL_FOREGROUND_COLOR);
-this->user_data((void*)(1));
+this->labeltype(FL_NO_LABEL);
+this->labelfont(0);
+this->labelsize(14);
+this->labelcolor(FL_FOREGROUND_COLOR);
 this->align(Fl_Align(96|FL_ALIGN_INSIDE));
-{ derelict_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
+this->when(FL_WHEN_RELEASE);
+{ RKR_Light_Button* o = derelict_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
   derelict_activar->box(FL_UP_BOX);
   derelict_activar->shortcut(0x33);
   derelict_activar->color((Fl_Color)62);
@@ -195,11 +193,12 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   derelict_activar->labelfont(0);
   derelict_activar->labelsize(10);
   derelict_activar->labelcolor(FL_FOREGROUND_COLOR);
-  derelict_activar->callback((Fl_Callback*)cb_derelict_activar, (void*)(2));
+  derelict_activar->callback((Fl_Callback*)cb_derelict_activar);
   derelict_activar->align(Fl_Align(68|FL_ALIGN_INSIDE));
   derelict_activar->when(FL_WHEN_CHANGED);
+  activate_effect = o;
 } // RKR_Light_Button* derelict_activar
-{ derelict_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
+{ RKR_Choice* o = derelict_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
   derelict_preset->box(FL_FLAT_BOX);
   derelict_preset->down_box(FL_BORDER_BOX);
   derelict_preset->color(FL_BACKGROUND_COLOR);
@@ -210,10 +209,11 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   derelict_preset->labelcolor(FL_BACKGROUND2_COLOR);
   derelict_preset->textsize(10);
   derelict_preset->textcolor(FL_BACKGROUND2_COLOR);
-  derelict_preset->callback((Fl_Callback*)cb_derelict_preset, (void*)(12017));
+  derelict_preset->callback((Fl_Callback*)cb_derelict_preset, (void*)(UD_PRESET_DERELICT));
   derelict_preset->align(Fl_Align(FL_ALIGN_LEFT));
   derelict_preset->when(FL_WHEN_RELEASE_ALWAYS);
   derelict_preset->menu(menu_derelict_preset);
+  preset_choice = o;
 } // RKR_Choice* derelict_preset
 { derelict_WD = new RKR_Slider(56, 28, 100, 10, "Dry/Wet");
   derelict_WD->type(5);
@@ -306,7 +306,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   derelict_neg->labelfont(0);
   derelict_neg->labelsize(10);
   derelict_neg->labelcolor(FL_BACKGROUND2_COLOR);
-  derelict_neg->callback((Fl_Callback*)cb_derelict_neg, (void*)(2));
+  derelict_neg->callback((Fl_Callback*)cb_derelict_neg);
   derelict_neg->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   derelict_neg->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* derelict_neg
@@ -368,7 +368,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   derelict_pf->labelfont(0);
   derelict_pf->labelsize(10);
   derelict_pf->labelcolor(FL_BACKGROUND2_COLOR);
-  derelict_pf->callback((Fl_Callback*)cb_derelict_pf, (void*)(2));
+  derelict_pf->callback((Fl_Callback*)cb_derelict_pf);
   derelict_pf->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   derelict_pf->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* derelict_pf
@@ -410,4 +410,46 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
 } // RKR_Slider* derelict_hpf
 position(X, Y);
 end();
+}
+
+void DerelictGui::parameter_refresh(int index) {
+  switch (index)
+      {
+      case Dere_DryWet:
+          derelict_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_DryWet)));
+          break;
+      case Dere_Pan:
+          derelict_pan->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_Pan)-64);
+          break;
+      case Dere_LR_Cross:
+          derelict_LRc->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_LR_Cross));
+          break;
+      case Dere_Drive:
+          derelict_drive->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_Drive));
+          break;
+      case Dere_Level:
+          derelict_level->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_Level));
+          break;
+      case Dere_Type:
+          derelict_tipo->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_Type));
+          break;
+      case Dere_Negate:
+          derelict_neg->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_Negate));
+          break;
+      case Dere_LPF:
+          derelict_lpf->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_LPF));
+          break;
+      case Dere_HPF:
+          derelict_hpf->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_HPF));
+          break;
+      case Dere_Color:
+          derelict_st->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_Color));
+          break;
+      case Dere_Prefilter:
+          derelict_pf->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_Prefilter));
+          break;
+      case Dere_Suboctave:
+          derelict_oct->value(m_process->Rack_Effects[EFX_DERELICT]->getpar(Dere_Suboctave));
+          break;
+      }
 }

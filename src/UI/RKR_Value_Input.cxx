@@ -46,7 +46,8 @@ RKR_Value_Input::RKR_Value_Input(int X, int Y, int W, int H, const char* l) :
     m_text_offset(0),       // C_DEFAULT_FONT_SIZE
     m_start_width(W),
     m_start_height(H),
-    m_previous_font_size(global_font_size)
+    m_look_changed(0),
+    is_redraw(0)
 {
     if (input.parent()) // defeat automatic-add
         input.parent()->remove(input);
@@ -59,6 +60,8 @@ RKR_Value_Input::RKR_Value_Input(int X, int Y, int W, int H, const char* l) :
     align(FL_ALIGN_LEFT);
     value_damage();
     set_flag(SHORTCUT_LABEL);
+    
+    this->user_data((void*)(UD_RKR_Highlight));
 }
 
 RKR_Value_Input::~RKR_Value_Input()
@@ -71,13 +74,24 @@ RKR_Value_Input::~RKR_Value_Input()
 
 void RKR_Value_Input::draw()
 {
-    /* To update the font size if user changes the value in settings rakarrack+ */
-    if(global_font_size != m_previous_font_size)
+    if(m_look_changed != global_look_changed)
     {
-        m_previous_font_size = global_font_size;
+        m_look_changed = global_look_changed;
+        
+        color(global_fore_color);
+        labelcolor(global_label_color);
+        labelfont(global_font_type);
+        textfont(global_font_type);
         font_resize(w(), h());
     }
     
+    // If redraw() because of focus, we change color to global_leds_color to show focus.
+    // So do not change the color back to global_label_color until unfocus.
+    if(!is_redraw)
+    {
+        textcolor(global_label_color);
+    }
+
     if (damage()&~FL_DAMAGE_CHILD) input.clear_damage(FL_DAMAGE_ALL);
     input.box(box());
     input.color(color(), selection_color());
@@ -120,7 +134,7 @@ void RKR_Value_Input::resize(int X, int Y, int W, int H)
 
 void RKR_Value_Input::input_cb(Fl_Widget*, void* v)
 {
-    RKR_Value_Input& t = *(RKR_Value_Input*) v;
+    RKR_Value_Input& t = * static_cast<RKR_Value_Input *>(v);
     double nv;
     if ((t.step() - floor(t.step())) > 0.0 || t.step() == 0.0) nv = strtod(t.input.value(), 0);
     else nv = strtol(t.input.value(), 0, 0);
@@ -163,15 +177,17 @@ int RKR_Value_Input::handle(int event)
     /* Need to handle focus to get keyboard events */
     if (event == FL_FOCUS)
     {
-        textcolor(leds_color);
+        textcolor(global_leds_color);
+        is_redraw = 1;  // so draw() does not reset the color to global_label_color
         redraw();
-        return 1;   // says we handed it
+        return 1;       // says we handed it
     }
     
     /* Revert color */
     if(event == FL_UNFOCUS)
     {
-        textcolor(label_color);
+        textcolor(global_label_color);
+        is_redraw = 0;  // ok for draw() set to global_label_color
         redraw();
         return 1;
     }
@@ -179,7 +195,8 @@ int RKR_Value_Input::handle(int event)
     /* Change text color on focus */
     if ((Fl::focus() == &input || Fl::focus() == this))
     {
-        textcolor(leds_color);
+        textcolor(global_leds_color);
+        is_redraw = 1;  // so draw() does not reset the color to global_label_color
         redraw();
     }
     

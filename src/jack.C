@@ -27,38 +27,25 @@
 #include "jack.h"
 #include "global.h"
 
-
-RKR *JackOUT;
-
-jack_client_t *jackclient;
 jack_port_t *outport_left, *outport_right;
 jack_port_t *inputport_left, *inputport_right, *inputport_aux;
 jack_port_t *jack_midi_in, *jack_midi_out;
 
-int jackprocess(jack_nframes_t nframes, void *arg);
-#ifdef JACK_SESSION
-jack_session_event_t *s_event;
-void session_callback(jack_session_event_t *event, void *arg);
-#endif
 
 int
-JACKstart(RKR * rkr_, jack_client_t * jackclient_)
+JACKstart(RKR * rkr_)
 {
-    JackOUT = rkr_;
-    jackclient = jackclient_;
+    RKR *JackOUT = rkr_;
+    jack_client_t *jackclient = JackOUT->jackclient;
 
     // Initialize output ringbuffers for MIDIConverter
     JackOUT->efx_MIDIConverter->m_buffSize = jack_ringbuffer_create(JACK_RINGBUFFER_SIZE);
     JackOUT->efx_MIDIConverter->m_buffMessage = jack_ringbuffer_create(JACK_RINGBUFFER_SIZE);
 
-    jack_set_sync_callback(jackclient, timebase, NULL);
-    jack_set_process_callback(jackclient, jackprocess, 0);
+    jack_set_sync_callback(jackclient, timebase, JackOUT);
+    jack_set_process_callback(jackclient, jackprocess, JackOUT);
 
-#ifdef JACK_SESSION
-    jack_set_session_callback(jackclient, session_callback, NULL);
-#endif
-
-    jack_on_shutdown(jackclient, jackshutdown, 0);
+    jack_on_shutdown(jackclient, jackshutdown, JackOUT);
 
 
     inputport_left =
@@ -92,30 +79,30 @@ JACKstart(RKR * rkr_, jack_client_t * jackclient_)
         return (2);
     }
 
-    if ((JackOUT->aconnect_JA) && (!needtoloadstate))
+    if (JackOUT->Config.aconnect_JA)
     {
-        for (int i = 0; i < JackOUT->cuan_jack; i += 2)
+        for (int i = 0; i < JackOUT->Config.cuan_jack; i += 2)
         {
             jack_connect(jackclient, jack_port_name(outport_left),
-                         JackOUT->jack_po[i].name);
+                         JackOUT->Config.jack_po[i].name);
             jack_connect(jackclient, jack_port_name(outport_right),
-                         JackOUT->jack_po[i + 1].name);
+                         JackOUT->Config.jack_po[i + 1].name);
         }
     }
 
-    if ((JackOUT->aconnect_JIA) && (!needtoloadstate))
+    if (JackOUT->Config.aconnect_JIA)
     {
-        if (JackOUT->cuan_ijack == 1)
+        if (JackOUT->Config.cuan_ijack == 1)
         {
-            jack_connect(jackclient, JackOUT->jack_poi[0].name, jack_port_name(inputport_left));
-            jack_connect(jackclient, JackOUT->jack_poi[0].name, jack_port_name(inputport_right));
+            jack_connect(jackclient, JackOUT->Config.jack_poi[0].name, jack_port_name(inputport_left));
+            jack_connect(jackclient, JackOUT->Config.jack_poi[0].name, jack_port_name(inputport_right));
         }
         else
         {
-            for (int i = 0; i < JackOUT->cuan_ijack; i += 2)
+            for (int i = 0; i < JackOUT->Config.cuan_ijack; i += 2)
             {
-                jack_connect(jackclient, JackOUT->jack_poi[i].name, jack_port_name(inputport_left));
-                jack_connect(jackclient, JackOUT->jack_poi[i + 1].name, jack_port_name(inputport_right));
+                jack_connect(jackclient, JackOUT->Config.jack_poi[i].name, jack_port_name(inputport_left));
+                jack_connect(jackclient, JackOUT->Config.jack_poi[i + 1].name, jack_port_name(inputport_right));
             }
         }
     }
@@ -124,8 +111,10 @@ JACKstart(RKR * rkr_, jack_client_t * jackclient_)
 }
 
 int
-jackprocess(jack_nframes_t nframes, void * /* arg */)
+jackprocess(jack_nframes_t nframes, void *arg)
 {
+    RKR *JackOUT = static_cast<RKR *>(arg);
+    
     jack_midi_event_t midievent;
     jack_position_t pos;
     jack_transport_state_t astate;
@@ -145,33 +134,33 @@ jackprocess(jack_nframes_t nframes, void * /* arg */)
             jack_port_get_buffer(inputport_aux, nframes);
 
 
-    JackOUT->cpuload = jack_cpu_load(jackclient);
+    JackOUT->cpuload = jack_cpu_load(JackOUT->jackclient);
 
 
-    if ((JackOUT->Tap_Bypass) && (JackOUT->Tap_Selection == 2))
+    if ((JackOUT->Tap_Active) && (JackOUT->Tap_Selection == 2))
     {
-        astate = jack_transport_query(jackclient, &pos);
+        astate = jack_transport_query(JackOUT->jackclient, &pos);
         
         if (astate > 0)
         {
             if (JackOUT->jt_tempo != pos.beats_per_minute)
-                actualiza_tap(pos.beats_per_minute);
+                actualiza_tap(pos.beats_per_minute, JackOUT);
         }
 
-        if (JackOUT->Looper_Bypass)
+        if (JackOUT->EFX_Active[EFX_LOOPER])
         {
             if ((astate != JackOUT->jt_state) && (astate == 0))
             {
                 JackOUT->jt_state = astate;
-                JackOUT->efx_Looper->changepar(2, 1);
-                stecla = 5;
+                JackOUT->Rack_Effects[EFX_LOOPER]->changepar(Looper_Stop, 1);
+                JackOUT->Gui_Refresh = GUI_Refresh_Looper;
             }
 
             if ((astate != JackOUT->jt_state) && (astate == 3))
             {
                 JackOUT->jt_state = astate;
-                JackOUT->efx_Looper->changepar(1, 1);
-                stecla = 5;
+                JackOUT->Rack_Effects[EFX_LOOPER]->changepar(Looper_Play, 1);
+                JackOUT->Gui_Refresh = GUI_Refresh_Looper;
             }
         }
     }
@@ -179,42 +168,42 @@ jackprocess(jack_nframes_t nframes, void * /* arg */)
 
     int jnumpi = jack_port_connected(inputport_left) + jack_port_connected(inputport_right);
     
-    if (jnumpi != JackOUT->numpi)
+    if (jnumpi != JackOUT->Jack_IN_Port_Connnection_Status)
     {
-        JackOUT->numpi = jnumpi;
-        JackOUT->numpc = 1;
+        JackOUT->Jack_IN_Port_Connnection_Status = jnumpi;
+        JackOUT->Jack_Port_Connnection_Changed = 1;
     }
     
     int jnumpo = jack_port_connected(outport_left) + jack_port_connected(outport_right);
     
-    if (jnumpo != JackOUT->numpo)
+    if (jnumpo != JackOUT->Jack_OUT_Port_Connnection_Status)
     {
-        JackOUT->numpo = jnumpo;
-        JackOUT->numpc = 1;
+        JackOUT->Jack_OUT_Port_Connnection_Status = jnumpo;
+        JackOUT->Jack_Port_Connnection_Changed = 1;
     }
     
     int jnumpa = jack_port_connected(inputport_aux);
     
-    if (jnumpa != JackOUT->numpa)
+    if (jnumpa != JackOUT->Jack_AUX_Port_Connnection_Status)
     {
-        JackOUT->numpa = jnumpa;
-        JackOUT->numpc = 1;
+        JackOUT->Jack_AUX_Port_Connnection_Status = jnumpa;
+        JackOUT->Jack_Port_Connnection_Changed = 1;
     }
 
     int jnumpmi = jack_port_connected(jack_midi_in);
     
-    if (jnumpmi != JackOUT->numpmi)
+    if (jnumpmi != JackOUT->Jack_MIDI_IN_Port_Connnection_Status)
     {
-        JackOUT->numpmi = jnumpmi;
-        JackOUT->numpc = 1;
+        JackOUT->Jack_MIDI_IN_Port_Connnection_Status = jnumpmi;
+        JackOUT->Jack_Port_Connnection_Changed = 1;
     }
 
     int jnumpmo = jack_port_connected(jack_midi_out);
     
-    if (jnumpmo != JackOUT->numpmo)
+    if (jnumpmo != JackOUT->Jack_MIDI_OUT_Port_Connnection_Status)
     {
-        JackOUT->numpmo = jnumpmo;
-        JackOUT->numpc = 1;
+        JackOUT->Jack_MIDI_OUT_Port_Connnection_Status = jnumpmo;
+        JackOUT->Jack_Port_Connnection_Changed = 1;
     }
 
 
@@ -229,7 +218,6 @@ jackprocess(jack_nframes_t nframes, void * /* arg */)
     }
 
     /* For midi outgoing - MIDIConverter */
-    jack_midi_data_t *midiData;
     int space = 0;
 
     void *buffer = jack_port_get_buffer(jack_midi_out, nframes);
@@ -240,7 +228,7 @@ jackprocess(jack_nframes_t nframes, void * /* arg */)
         while (jack_ringbuffer_read_space(JackOUT->efx_MIDIConverter->m_buffSize) > 0)
         {
             jack_ringbuffer_read(JackOUT->efx_MIDIConverter->m_buffSize, (char *) &space, (size_t) sizeof (space));
-            midiData = jack_midi_event_reserve(buffer, 0, space);
+            jack_midi_data_t *midiData = jack_midi_event_reserve(buffer, 0, space);
 
             jack_ringbuffer_read(JackOUT->efx_MIDIConverter->m_buffMessage, (char *) midiData, (size_t) space);
         }
@@ -256,7 +244,7 @@ jackprocess(jack_nframes_t nframes, void * /* arg */)
                sizeof (jack_default_audio_sample_t) * nframes);
 
 
-        JackOUT->Alg(inl, inr, 0);
+        JackOUT->process_effects(inl, inr, 0);
 
         memcpy(outl, JackOUT->efxoutl,
                sizeof (jack_default_audio_sample_t) * nframes);
@@ -269,11 +257,11 @@ jackprocess(jack_nframes_t nframes, void * /* arg */)
 }
 
 void
-JACKfinish()
+JACKfinish(RKR * JackOUT)
 {
-    if(jackclient)
+    if(JackOUT->jackclient)
     {
-        jack_client_close(jackclient);
+        jack_client_close(JackOUT->jackclient);
     }
     
     if(JackOUT->efx_MIDIConverter->m_buffSize != NULL && JackOUT->efx_MIDIConverter->m_buffMessage != NULL)
@@ -286,24 +274,27 @@ JACKfinish()
 }
 
 void
-jackshutdown(void * /* arg */)
+jackshutdown(void *arg)
 {
-    if (gui == 0)
+    RKR *JackOUT = static_cast<RKR *>(arg);
+    if (!JackOUT->Gui_Shown)
     {
         printf("Jack Shut Down, sorry.\n");
     }
     else
     {
-        JackOUT->jshut = 1;
+        JackOUT->Jack_Shut_Down = 1;
     }
 }
 
 int
-timebase(jack_transport_state_t state, jack_position_t *pos, void * /* arg */)
+timebase(jack_transport_state_t state, jack_position_t *pos, void *arg)
 {
+    RKR *JackOUT = static_cast<RKR *>(arg);
+    
     JackOUT->jt_state = state;
 
-    if ((JackOUT->Tap_Bypass) && (JackOUT->Tap_Selection == 2))
+    if ((JackOUT->Tap_Active) && (JackOUT->Tap_Selection == 2))
     {
         if ((state > 0) && (pos->beats_per_minute > 0))
         {
@@ -312,10 +303,10 @@ timebase(jack_transport_state_t state, jack_position_t *pos, void * /* arg */)
             JackOUT->Update_tempo();
             JackOUT->Tap_Display = 1;
             
-            if ((JackOUT->Looper_Bypass) && (state == 3))
+            if ((JackOUT->EFX_Active[EFX_LOOPER]) && (state == 3))
             {
-                JackOUT->efx_Looper->changepar(1, 1);
-                stecla = 5;
+                JackOUT->Rack_Effects[EFX_LOOPER]->changepar(Looper_Play, 1);
+                JackOUT->Gui_Refresh = GUI_Refresh_Looper;
             }
         }
     }
@@ -324,46 +315,11 @@ timebase(jack_transport_state_t state, jack_position_t *pos, void * /* arg */)
 }
 
 void
-actualiza_tap(double val)
+actualiza_tap(double val, RKR * JackOUT)
 {
     JackOUT->jt_tempo = val;
     JackOUT->Tap_TempoSet = lrint(JackOUT->jt_tempo);
     JackOUT->Update_tempo();
     JackOUT->Tap_Display = 1;
 }
-
-
-#ifdef JACK_SESSION
-
-void session_callback(jack_session_event_t *event, void * /* arg */)
-{
-    char filename[256];
-    char command[256];
-
-    s_event = event;
-    snprintf(filename, sizeof (filename), "%srackstate.rkr", s_event->session_dir);
-    snprintf(command, sizeof (command), "rakarrack -u %s ${SESSION_DIR}rackstate.rkr", s_event->client_uuid);
-
-    s_event->command_line = strdup(command);
-    jack_session_reply(jackclient, s_event);
-
-    if (s_event->type == JackSessionSave)
-    {
-        JackOUT->savefile(filename);
-    }
-
-    if (s_event->type == JackSessionSaveAndQuit)
-    {
-        JackOUT->savefile(filename);
-        needtoloadstate = 1;
-        Pexitprogram = 1;
-    }
-
-    jack_session_event_free(s_event);
-}
-
-#endif
-
-
-
 

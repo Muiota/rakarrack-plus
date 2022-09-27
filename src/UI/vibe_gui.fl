@@ -11,47 +11,46 @@ decl {\#include "RKR_Check_Button.h"} {public global
 decl {\#include "RKR_Choice.h"} {public global
 }
 
-widget_class {\#include "common_gui_menu.h"} VibeGui {
-  user_data 1 open
+decl {\#include "RKR_GUI_Effect.h"} {public global
+}
+
+widget_class {\#include "common_gui_menu.h"} VibeGui {open selected
   xywh {1550 56 155 180} type Double box UP_BOX color 0 selection_color 0 align 112
   code0 {\#include "RKR_Slider.h"}
   code1 {\#include "../process.h"}
   code2 {\#include "rakarrack.h"}
-  code3 {\#include "common_gui_menu.h"} visible position_relative
+  code3 {\#include "common_gui_menu.h"}
+  class RKR_Gui_Effect visible position_relative
 } {
   Fl_Light_Button vibe_activar {
     label On
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Vibe_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_VIBE]);
  return;
 }
-rkr->Vibe_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_VIBE]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_Vibe->cleanup();
-rgui->findpos(45,(int)o->value(),o);}
+m_process->Rack_Effects[EFX_VIBE]->cleanup();
+m_parent->findpos(EFX_VIBE,(int)o->value(),o);}
     xywh {5 4 34 18} shortcut 0x38 color 62 selection_color 1 labelsize 10 align 84 when 1
+    code0 {activate_effect = o;}
     class RKR_Light_Button
   }
   Fl_Choice vibe_preset {
     label Preset
-    user_data 12045
+    user_data UD_PRESET_VIBE
     callback {long long ud= (long long) v;
-if((ud==0)||(ud==12045))rkr->efx_Vibe->setpreset((int)o->value());
-vibe_WD->value(Dry_Wet(rkr->efx_Vibe->getpar(6)));
-vibe_width->value(rkr->efx_Vibe->getpar(0));
-vibe_dpth->value(rkr->efx_Vibe->getpar(8));
-vibe_freq->value(rkr->efx_Vibe->getpar(1));
-vibe_rnd->value(rkr->efx_Vibe->getpar(2));
-vibe_lfotype->value(rkr->efx_Vibe->getpar(3));
-vibe_stdf->value(rkr->efx_Vibe->getpar(4));
-vibe_pan->value(rkr->efx_Vibe->getpar(5)-64);
-vibe_fb->value(rkr->efx_Vibe->getpar(7)-64);
-vibe_LR->value(rkr->efx_Vibe->getpar(9));
-vibe_stereo->value(rkr->efx_Vibe->getpar(10));}
+if((ud==0)||(ud==UD_PRESET_VIBE))
+    m_process->Rack_Effects[EFX_VIBE]->setpreset((int)o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_VIBE]; i++)
+{
+    parameter_refresh(i);
+};}
     xywh {77 4 76 18} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
+    code0 {preset_choice = o;}
     class RKR_Choice
   } {
     MenuItem {} {
@@ -93,123 +92,165 @@ vibe_stereo->value(rkr->efx_Vibe->getpar(10));}
   }
   Fl_Value_Slider vibe_WD {
     label {Dry/Wet}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(386);
+ m_parent->getMIDIControl(MC_Vibe_DryWet);
  return;
 }
-rkr->efx_Vibe->changepar(6,Dry_Wet((int)(o->value())));}
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_DryWet,Dry_Wet((int)(o->value())));}
     xywh {56 29 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider vibe_width {
     label Width
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(387);
+ m_parent->getMIDIControl(MC_Vibe_Width);
  return;
 }
-rkr->efx_Vibe->changepar(0,(int)o->value());}
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_Width,(int)o->value());}
     xywh {56 42 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider vibe_dpth {
     label Depth
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(388);
+ m_parent->getMIDIControl(MC_Vibe_Depth);
  return;
 }
-rkr->efx_Vibe->changepar(8,(int)o->value());}
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_Depth,(int)o->value());}
     xywh {56 55 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider vibe_freq {
     label Tempo
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(389);
+ m_parent->getMIDIControl(MC_Vibe_LFO_Tempo);
  return;
 }
-rkr->efx_Vibe->changepar(1,(int)o->value());}
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_LFO_Tempo,(int)o->value());}
     xywh {56 68 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 1 maximum 600 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider vibe_rnd {
     label Random
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(390);
+ m_parent->getMIDIControl(MC_Vibe_LFO_Random);
  return;
 }
-rkr->efx_Vibe->changepar(2,(int)o->value());}
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_LFO_Random,(int)o->value());}
     xywh {56 81 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Choice vibe_lfotype {
     label {LFO Type}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(469);
+ m_parent->getMIDIControl(MC_Vibe_LFO_Type);
  return;
 }
 
-rkr->efx_Vibe->changepar(3,(int)o->value());} selected
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_LFO_Type,(int)o->value());}
     xywh {78 96 72 16} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 textsize 10 textcolor 7
     code0 {o->menu(m_lfo_menu->get_lfo_type());}
     class RKR_Choice
   } {}
   Fl_Value_Slider vibe_stdf {
     label {Stereo Df}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(391);
+ m_parent->getMIDIControl(MC_Vibe_LFO_Stereo);
  return;
 }
-rkr->efx_Vibe->changepar(4,(int)o->value());}
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_LFO_Stereo,(int)o->value());}
     tooltip {LFO L/R Delay} xywh {56 118 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider vibe_fb {
     label Feedback
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(392);
+ m_parent->getMIDIControl(MC_Vibe_Feedback);
  return;
 }
-rkr->efx_Vibe->changepar(7,(int)(o->value()+64));}
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_Feedback,(int)(o->value()+64));}
     xywh {56 131 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 64 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider vibe_LR {
     label {L/R Cross}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(393);
+ m_parent->getMIDIControl(MC_Vibe_LR_Cross);
  return;
 }
-rkr->efx_Vibe->changepar(9,(int)(o->value()));}
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_LR_Cross,(int)(o->value()));}
     xywh {56 144 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 128 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider vibe_pan {
     label Pan
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(394);
+ m_parent->getMIDIControl(MC_Vibe_Pan);
  return;
 }
-rkr->efx_Vibe->changepar(5,(int)(o->value()+64));}
+m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_Pan,(int)(o->value()+64));}
     xywh {56 157 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 64 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Check_Button vibe_stereo {
     label Stereo
-    user_data 2
-    callback {rkr->efx_Vibe->changepar(10,(int)o->value())}
-    xywh {103 169 43 14} down_box BORDER_BOX labelsize 10 labelcolor 7
+    callback {m_process->Rack_Effects[EFX_VIBE]->changepar(Vibe_Stereo,(int)o->value())}
+    xywh {103 169 52 14} down_box BORDER_BOX labelsize 10 labelcolor 7
     class RKR_Check_Button
   }
   decl {CommonGuiMenu *m_lfo_menu;} {private local
+  }
+  Function {parameter_refresh(int index)} {return_type void
+  } {
+    code {switch (index)
+    {
+    case Vibe_Width:
+        vibe_width->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_Width));
+        break;
+    case Vibe_LFO_Tempo:
+        vibe_freq->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_LFO_Tempo));
+        break;
+    case Vibe_LFO_Random:
+        vibe_rnd->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_LFO_Random));
+        break;
+    case Vibe_LFO_Type:
+        vibe_lfotype->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_LFO_Type));
+        break;
+    case Vibe_LFO_Stereo:
+        vibe_stdf->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_LFO_Stereo));
+        break;
+    case Vibe_Pan:
+        vibe_pan->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_Pan)-64);
+        break;
+    case Vibe_DryWet:
+        vibe_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_DryWet)));
+        break;
+    case Vibe_Feedback:
+        vibe_fb->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_Feedback)-64);
+        break;
+    case Vibe_Depth:
+        vibe_dpth->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_Depth));
+        break;
+    case Vibe_LR_Cross:
+        vibe_LR->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_LR_Cross));
+        break;
+    case Vibe_Stereo:
+        vibe_stereo->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_Stereo));
+        break;
+    }} {}
+  }
+  Function {tap_tempo_update()} {return_type void
+  } {
+    code {vibe_freq->value(m_process->Rack_Effects[EFX_VIBE]->getpar(Vibe_LFO_Tempo));} {}
   }
 }

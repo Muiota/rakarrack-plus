@@ -1,5 +1,5 @@
 # data file for the Fltk User Interface Designer (fluid)
-version 1.0304
+version 1.0308
 header_name {.h}
 code_name {.cxx}
 decl {\#include "RKR_Light_Button.h"} {public global
@@ -11,52 +11,44 @@ decl {\#include "RKR_Check_Button.h"} {public global
 decl {\#include "RKR_Choice.h"} {public global
 }
 
-widget_class RevtronGui {
-  user_data 1 open
-  xywh {1550 57 155 180} type Double box UP_BOX color 0 selection_color 0 align 112
+decl {\#include "RKR_GUI_Effect.h"} {public global
+}
+
+widget_class RevtronGui {open selected
+  xywh {1550 59 155 180} type Double box UP_BOX color 0 selection_color 0 align 112
   code0 {\#include "RKR_Slider.h"}
   code1 {\#include "../process.h"}
-  code2 {\#include "rakarrack.h"} visible position_relative
+  code2 {\#include "rakarrack.h"}
+  class RKR_Gui_Effect visible position_relative
 } {
   Fl_Light_Button revtron_activar {
     label On
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Reverbtron_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_REVERBTRON]);
  return;
 }
-rkr->Reverbtron_Bypass=(int)o->value();
-if((int) o->value()==0) rkr->efx_Reverbtron->cleanup();
-rgui->findpos(40,(int)o->value(),o);}
-    xywh {6 4 34 18} shortcut 0x35 color 62 selection_color 1 labelsize 10 align 84 when 1
+m_process->EFX_Active[EFX_REVERBTRON]=(int)o->value();
+if((int) o->value()==0) m_process->Rack_Effects[EFX_REVERBTRON]->cleanup();
+m_parent->findpos(EFX_REVERBTRON,(int)o->value(),o);}
+    xywh {5 4 34 18} shortcut 0x35 color 62 selection_color 1 labelsize 10 align 84 when 1
+    code0 {activate_effect = o;}
     class RKR_Light_Button
   }
   Fl_Choice revtron_preset {
     label Preset
-    user_data 12040
+    user_data UD_PRESET_REVERBTRON
     callback {long long ud= (long long) v;
-if((ud==0)||(ud==12040))rkr->efx_Reverbtron->setpreset((int) o->value());
-revtron_pan->value(rkr->efx_Reverbtron->getpar(11)-64);
-revtron_level->value(rkr->efx_Reverbtron->getpar(7));
-revtron_WD->value(Dry_Wet(rkr->efx_Reverbtron->getpar(0)));
-revtron_damp->value(rkr->efx_Reverbtron->getpar(6));
-revtron_fnum->value(rkr->efx_Reverbtron->getpar(8));
-revtron_length->value(rkr->efx_Reverbtron->getpar(3));
-revtron_strech->value(rkr->efx_Reverbtron->getpar(9));
-revtron_safe->value(rkr->efx_Reverbtron->getpar(2));
-revtron_user->value(rkr->efx_Reverbtron->getpar(4));
-revtron_user->do_callback();
-revtron_fb->value(rkr->efx_Reverbtron->getpar(10));
-revtron_fade->value(rkr->efx_Reverbtron->getpar(1));
-revtron_idelay->value(rkr->efx_Reverbtron->getpar(5));
-revtron_LPF->value(rkr->efx_Reverbtron->getpar(14));
-revtron_diff->value(rkr->efx_Reverbtron->getpar(15));
+if((ud==0)||(ud==UD_PRESET_REVERBTRON))
+    m_process->Rack_Effects[EFX_REVERBTRON]->setpreset((int) o->value());
 
-revtron_es->value(rkr->efx_Reverbtron->getpar(12));
-revtron_rv->value(rkr->efx_Reverbtron->getpar(13));}
-    xywh {79 4 76 18} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_REVERBTRON]; i++)
+{
+    parameter_refresh(i);
+};}
+    xywh {77 4 76 18} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
+    code0 {preset_choice = o;}
     class RKR_Choice
   } {
     MenuItem {} {
@@ -98,176 +90,211 @@ revtron_rv->value(rkr->efx_Reverbtron->getpar(13));}
   }
   Fl_Value_Slider revtron_WD {
     label {Dry/Wet}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(339);
+ m_parent->getMIDIControl(MC_Revtron_DryWet);
  return;
 }
-rkr->efx_Reverbtron->changepar(0,Dry_Wet((int)(o->value())));}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_DryWet,Dry_Wet((int)(o->value())));}
     xywh {56 25 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_pan {
     label Pan
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(340);
+ m_parent->getMIDIControl(MC_Revtron_Pan);
  return;
 }
-rkr->efx_Reverbtron->changepar(11,(int)(o->value()+64));}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Pan,(int)(o->value()+64));}
     xywh {56 37 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_level {
     label Level
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(341);
+ m_parent->getMIDIControl(MC_Revtron_Level);
  return;
 }
-rkr->efx_Reverbtron->changepar(7,(int)o->value());}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Level,(int)o->value());}
     xywh {56 49 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_damp {
     label Damp
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(342);
+ m_parent->getMIDIControl(MC_Revtron_Damp);
  return;
 }
-rkr->efx_Reverbtron->changepar(6,(int)o->value());}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Damp,(int)o->value());}
     xywh {56 61 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_fb {
     label Feedback
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(343);
+ m_parent->getMIDIControl(MC_Revtron_Feedback);
  return;
 }
-rkr->efx_Reverbtron->changepar(10,(int)o->value());}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Feedback,(int)o->value());}
     xywh {56 73 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 64 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_length {
     label Length
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(344);
+ m_parent->getMIDIControl(MC_Revtron_Length);
  return;
 }
-rkr->efx_Reverbtron->changepar(3,(int)o->value());}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Length,(int)o->value());}
     xywh {56 85 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 minimum 20 maximum 1500 step 1 value 100 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_strech {
     label Stretch
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(345);
+ m_parent->getMIDIControl(MC_Revtron_Stretch);
  return;
 }
-rkr->efx_Reverbtron->changepar(9,(int)o->value());}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Stretch,(int)o->value());}
     tooltip {Time Stretch} xywh {56 97 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 minimum -64 maximum 64 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_idelay {
     label {I. Del}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(346);
+ m_parent->getMIDIControl(MC_Revtron_I_Delay);
  return;
 }
-rkr->efx_Reverbtron->changepar(5,(int)o->value());}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_I_Delay,(int)o->value());}
     tooltip {Initial Delay} xywh {56 109 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 maximum 500 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_fade {
     label Fade
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(347);
+ m_parent->getMIDIControl(MC_Revtron_Fade);
  return;
 }
-rkr->efx_Reverbtron->changepar(1,(int)o->value());}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Fade,(int)o->value());}
     xywh {56 121 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_diff {
     label Diffusion
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(442);
+ m_parent->getMIDIControl(MC_Revtron_Diffusion);
  return;
 }
-rkr->efx_Reverbtron->changepar(15,(int)o->value());}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Diffusion,(int)o->value());}
     xywh {56 133 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider revtron_LPF {
     label LPF
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(443);
+ m_parent->getMIDIControl(MC_Revtron_LPF);
  return;
 }
-rkr->efx_Reverbtron->changepar(14,(int)o->value());}
+m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_LPF,(int)o->value());}
     tooltip {Lowpass Filter} xywh {56 145 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 minimum 20 maximum 26000 step 1 value 20 textcolor 7
     class RKR_Slider
   }
   Fl_Check_Button revtron_rv {
     label Sh
-    user_data 2
-    callback {rkr->efx_Reverbtron->changepar(13,(int)o->value());}
-    xywh {2 151 30 15} down_box BORDER_BOX labelsize 10 labelcolor 7
+    callback {m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Shuffle,(int)o->value());}
+    tooltip Shuffle xywh {2 151 30 15} down_box BORDER_BOX labelsize 10 labelcolor 7
     class RKR_Check_Button
   }
   Fl_Check_Button revtron_es {
     label ES
-    user_data 2
-    callback {rkr->efx_Reverbtron->changepar(12,(int)o->value());}
-    xywh {2 164 29 15} down_box BORDER_BOX labelsize 10 labelcolor 7
+    callback {m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Ex_Stereo,(int)o->value());}
+    tooltip {Extra stereo} xywh {2 164 29 15} down_box BORDER_BOX labelsize 10 labelcolor 7
     class RKR_Check_Button
   }
   Fl_Check_Button revtron_safe {
     label Safe
-    user_data 2
-    callback {rkr->efx_Reverbtron->changepar(2,(int)o->value());}
-    xywh {30 154 41 15} down_box BORDER_BOX labelsize 10 labelcolor 7
+    callback {m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Safe,(int)o->value());}
+    tooltip {Safe mode} xywh {30 154 41 15} down_box BORDER_BOX labelsize 10 labelcolor 7
     class RKR_Check_Button
   }
-  Fl_Check_Button revtron_user {
+  Fl_Box revtron_user {
     label User
-    user_data 2
-    callback {rkr->efx_Reverbtron->changepar(4,(int)o->value());
-
-if((int)o->value())B_rvb->activate(); else B_rvb->deactivate();}
-    xywh {67 154 39 15} down_box BORDER_BOX labelsize 10 labelcolor 7
-    class RKR_Check_Button
+    xywh {67 154 12 12} box DOWN_BOX labelsize 10 labelcolor 7 align 8
+    code0 {o->set_box_type(BOX_LIGHT);}
+    code1 {o->set_label_offset(1);}
+    class RKR_Box
   }
-  Fl_Button B_rvb {
-    label Browse
-    user_data 2
-    callback {char *filename;
-filename=fl_file_chooser("Load rvb File:","(*.rvb)",NULL,0);
-if (filename==NULL) return;
-filename=fl_filename_setext(filename,".rvb");
-strcpy(rkr->efx_Reverbtron->Filename,filename);
-
-if(!rkr->efx_Reverbtron->setfile(USERFILE))
-{
-    fl_alert("Error loading %s file!\\n", filename);
-}} selected
-    xywh {106 156 46 10} labelsize 10 deactivate
+  Fl_Button B_scan {
+    label Scan
+    callback {scan_for_new_rvb_files();}
+    tooltip {Scan the User Directory for .rvb files added after program start.} xywh {106 156 46 10} labelsize 10
     class RKR_Button
   }
   Fl_Choice revtron_fnum {
     label File
-    user_data 12
-    callback {rkr->efx_Reverbtron->changepar(8,(int)o->value());}
-    xywh {51 168 101 14} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 textsize 10 textcolor 7
+    callback {int user_file_selected = 0;
+    Fl_Menu_Item *m = const_cast<Fl_Menu_Item*>  (o->menu ());
+    std::string file = m[o->value()].label();
+    
+    // See if this is a User provided file by checking the vector of user files
+    for(unsigned i = 0; i < m_process->Reverbtron_RVB_Files.size (); i++)
+    {
+        // String compare by menu name
+        if(strcmp(file.c_str(), m_process->Reverbtron_RVB_Files[i].User_File_Menu_Name.c_str ()) == 0)
+        {
+            user_file_selected = 1;  // found
+            file = m_process->Reverbtron_RVB_Files[i].User_File_Name;  // full path
+            break;
+        }
+    }
+
+    if(user_file_selected)
+    {
+        // Copy the file name to the EFX
+        Reverbtron *Efx_Reverbtron = static_cast<Reverbtron*>(m_process->Rack_Effects[EFX_REVERBTRON]);
+        strcpy(Efx_Reverbtron->Filename, file.c_str());
+        
+        // Tell the EFX that this is a user supplied file
+        m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_User_File, 1);
+
+        // Try to load the user file
+        if(!Efx_Reverbtron->setfile(USERFILE))
+        {
+            m_process->Handle_Message(14, file);
+            
+            // The user file did not work, un-set the user file
+            m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_User_File, 0);
+        }
+        else
+        {
+            // User file was loaded so set the gui user check box
+            revtron_user->color (global_leds_color);
+            revtron_user->redraw ();
+        }
+    }
+    else
+    {
+        // They selected a program provided file, so un-set the User file
+        m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_User_File, 0);
+        
+        // Tell the EFX which program file to use
+        m_process->Rack_Effects[EFX_REVERBTRON]->changepar(Revtron_Set_File,(int)o->value());
+
+        // Not a user file so un-check the gui user check box
+        revtron_user->color (global_fore_color);
+        revtron_user->redraw ();
+    }}
+    tooltip {Select the .rvb file to be used. File preceded by a '*' are user supplied files in the User Directory.} xywh {51 168 101 14} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 textsize 10 textcolor 7
     class RKR_Choice
   } {
     MenuItem {} {
@@ -310,5 +337,122 @@ if(!rkr->efx_Reverbtron->setfile(USERFILE))
       label {Santa Lucia}
       xywh {0 0 36 21} labelsize 10
     }
+  }
+  Function {parameter_refresh(int index)} {return_type void
+  } {
+    code {switch (index)
+    {
+    case Revtron_DryWet:
+        revtron_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_DryWet)));
+        break;
+    case Revtron_Fade:
+        revtron_fade->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Fade));
+        break;
+    case Revtron_Safe:
+        revtron_safe->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Safe));
+        break;
+    case Revtron_Length:
+        revtron_length->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Length));
+        break;
+    case Revtron_User_File:
+    {
+        if(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_User_File))
+        {
+            revtron_user->color (global_leds_color);
+            revtron_user->redraw ();
+        }
+        else
+        {
+            revtron_user->color (global_fore_color);
+            revtron_user->redraw ();
+        }
+    }
+        break;
+    case Revtron_I_Delay:
+        revtron_idelay->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_I_Delay));
+        break;
+    case Revtron_Damp:
+        revtron_damp->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Damp));
+        break;
+    case Revtron_Level:
+        revtron_level->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Level));
+        break;
+    case Revtron_Set_File:
+        revtron_fnum->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Set_File));
+        break;
+    case Revtron_Stretch:
+        revtron_strech->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Stretch));
+        break;
+    case Revtron_Feedback:
+        revtron_fb->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Feedback));
+        break;
+    case Revtron_Pan:
+        revtron_pan->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Pan)-64);
+        break;
+    case Revtron_Ex_Stereo:
+        revtron_es->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Ex_Stereo));
+        break;
+    case Revtron_Shuffle:
+        revtron_rv->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Shuffle));
+        break;
+    case Revtron_LPF:
+        revtron_LPF->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_LPF));
+        break;
+    case Revtron_Diffusion:
+        revtron_diff->value(m_process->Rack_Effects[EFX_REVERBTRON]->getpar(Revtron_Diffusion));
+        break;
+    }} {}
+  }
+  Function {add_reverbtron_file(const std::string &name)} {return_type void
+  } {
+    code {revtron_fnum->add(name.c_str ());
+    
+    Fl_Menu_Item *m = const_cast<Fl_Menu_Item*>  (revtron_fnum->menu ());
+    Fl_Menu_Item *p;
+
+    int font_size = C_DEFAULT_FONT_SIZE;
+
+    for (int i = 0; i < m->size(); i++)
+    {
+        p = m->next(i);
+
+        if (i == 0)
+        {
+            font_size = p->labelsize();
+        }
+
+        p->labelsize(font_size);
+        p->labelfont (global_font_type);
+    }} {}
+  }
+  Function {add_user_files()} {return_type void
+  } {
+    code {for(unsigned i = 0; i < m_process->Reverbtron_RVB_Files.size(); i++)
+    {
+        add_reverbtron_file(m_process->Reverbtron_RVB_Files[i].User_File_Menu_Name );
+    }} {}
+  }
+  Function {scan_for_new_rvb_files()} {return_type void
+  } {
+    code {// This is just to get the current font size so the scan does not change the size
+    // when the menu is reloaded
+    Fl_Menu_Item *m = const_cast<Fl_Menu_Item*>  (revtron_fnum->menu ());
+    int font_size = m->next(0)->labelsize();
+
+    // Clear the whole menu and re-add everything
+    revtron_fnum->clear();
+
+    // Add the default
+    revtron_fnum->menu(menu_revtron_fnum);
+
+    // Set the font size for the first item, others will follow
+    m = const_cast<Fl_Menu_Item*>  (revtron_fnum->menu ());
+    m->next(0)->labelsize(font_size);
+
+    // Re scan the User Directory and reload user vector
+    m_process->load_reverbtron_vector();
+
+    // Add user files from vector to menu
+    add_user_files();} {}
   }
 }

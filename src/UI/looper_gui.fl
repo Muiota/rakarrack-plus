@@ -14,51 +14,57 @@ decl {\#include "RKR_Check_Button.h"} {public global
 decl {\#include "RKR_Choice.h"} {public global
 }
 
-widget_class LooperGui {
-  user_data 1 open
+decl {\#include "RKR_GUI_Effect.h"} {public global
+}
+
+widget_class LooperGui {open selected
   xywh {1550 57 155 180} type Double box UP_BOX color 0 selection_color 0 align 112
   code0 {\#include "RKR_Slider.h"}
   code1 {\#include "../process.h"}
-  code2 {\#include "rakarrack.h"} visible position_relative
+  code2 {\#include "rakarrack.h"}
+  class RKR_Gui_Effect visible position_relative
 } {
   Fl_Light_Button looper_activar {
     label On
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Looper_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_LOOPER]);
  return;
 }
-rkr->Looper_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_LOOPER]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_Looper->cleanup();
-rgui->findpos(30,(int)o->value(),o);}
+m_process->Rack_Effects[EFX_LOOPER]->cleanup();
+m_parent->findpos(EFX_LOOPER,(int)o->value(),o);}
     xywh {5 4 34 18} shortcut 0x35 color 62 selection_color 1 labelsize 10 align 84 when 1
+    code0 {activate_effect = o;}
     class RKR_Light_Button
   }
   Fl_Choice looper_preset {
     label Preset
-    user_data 12030
+    user_data UD_PRESET_LOOPER
     callback {long long ud= (long long) v;
-if((ud==0)||(ud==12030))rkr->efx_Looper->setpreset((int) o->value());
-looper_WD->value(Dry_Wet(rkr->efx_Looper->getpar(0)));
-looper_play->value(rkr->efx_Looper->getpar(1));
-looper_record->value(rkr->efx_Looper->getpar(3));
-looper_rv->value(rkr->efx_Looper->getpar(5));
-looper_ap->value(rkr->efx_Looper->getpar(9));
-looper_level1->value(rkr->efx_Looper->getpar(6));
-looper_level2->value(rkr->efx_Looper->getpar(10));
+if((ud==0)||(ud==UD_PRESET_LOOPER))
+    m_process->Rack_Effects[EFX_LOOPER]->setpreset((int) o->value());
+    
+looper_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_DryWet)));
+looper_play->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Play));
+looper_record->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Record));
+looper_rv->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Reverse));
+looper_ap->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_AutoPlay));
+looper_level1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Level_1));
+looper_level2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Level_2));
 
-looper_t1->value(rkr->efx_Looper->getpar(7));
-looper_t2->value(rkr->efx_Looper->getpar(8));
-looper_r1->value(rkr->efx_Looper->getpar(11));
-looper_r2->value(rkr->efx_Looper->getpar(12));
-looper_lnk->value(rkr->efx_Looper->getpar(13));
-looper_Tempo->value(rkr->efx_Looper->getpar(14));
-looper_bar->value(rkr->efx_Looper->getpar(15));
-looper_ms->value(rkr->efx_Looper->getpar(17));}
+looper_t1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Track_1));
+looper_t2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Track_2));
+looper_r1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Rec_1));
+looper_r2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Rec_2));
+looper_lnk->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Link));
+looper_Tempo->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Tempo));
+looper_bar->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Bar));
+looper_ms->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_M_S));}
     xywh {77 4 76 18} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
+    code0 {preset_choice = o;}
     class RKR_Choice
   } {
     MenuItem {} {
@@ -72,83 +78,81 @@ looper_ms->value(rkr->efx_Looper->getpar(17));}
   }
   Fl_Value_Slider looper_WD {
     label {Dry/Wet}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(267);
+ m_parent->getMIDIControl(MC_Looper_DryWet);
  return;
 }
-rkr->efx_Looper->changepar(0,Dry_Wet((int)(o->value())));}
-    xywh {53 25 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_DryWet,Dry_Wet((int)(o->value())));}
+    xywh {56 25 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider looper_level1 {
     label {Level 1}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(268);
+ m_parent->getMIDIControl(MC_Looper_Level_1);
  return;
 }
-rkr->efx_Looper->changepar(6,(int)o->value());}
-    xywh {53 37 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 maximum 127 step 1 textcolor 7
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Level_1,(int)o->value());}
+    xywh {56 37 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider looper_level2 {
     label {Level 2}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(269);
+ m_parent->getMIDIControl(MC_Looper_Level_2);
  return;
 }
-rkr->efx_Looper->changepar(10,(int)o->value());}
-    xywh {53 49 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 maximum 127 step 1 textcolor 7
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Level_2,(int)o->value());}
+    xywh {56 49 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider looper_Tempo {
     label Tempo
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(423);
+ m_parent->getMIDIControl(MC_Looper_Tempo);
  return;
 }
-rkr->efx_Looper->changepar(14,(int)o->value());}
-    xywh {53 61 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 minimum 20 maximum 380 step 1 value 100 textcolor 7
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Tempo,(int)o->value());}
+    xywh {56 61 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 minimum 20 maximum 380 step 1 value 100 textcolor 7
     class RKR_Slider
   }
   Fl_Choice looper_bar {
     label {Time Sig.}
-    callback {rkr->efx_Looper->changepar(15,(int)o->value());} open
+    callback {m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Bar,(int)o->value());} open
     xywh {57 73 40 15} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
     code0 {o->menu(m_looper_bar->get_time_sig());}
     class RKR_Choice
   } {}
   Fl_Choice looper_ms {
     label MS
-    callback {rkr->efx_Looper->changepar(17,(int)o->value());} open
+    callback {m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_M_S,(int)o->value());} open
     xywh {121 73 29 15} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
     code0 {o->menu(m_looper_ms->get_metronome_sound());}
     class RKR_Choice
   } {}
   Fl_Check_Button looper_rv {
     label Reverse
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(270);
+ m_parent->getMIDIControl(MC_Looper_Reverse);
  return;
 }
-rkr->efx_Looper->changepar(5,(int)o->value())}
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Reverse,(int)o->value())}
     tooltip {Play Loop in Reverse} xywh {8 89 61 15} down_box BORDER_BOX labelsize 10 labelcolor 7
     class RKR_Check_Button
   }
   Fl_Check_Button looper_ap {
     label {Auto Play}
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(271);
+ m_parent->getMIDIControl(MC_Looper_AutoPlay);
  return;
 }
-rkr->efx_Looper->changepar(9,(int)o->value())}
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_AutoPlay,(int)o->value())}
     xywh {78 89 67 15} down_box BORDER_BOX labelsize 10 labelcolor 7
     class RKR_Check_Button
   }
@@ -172,42 +176,39 @@ rkr->efx_Looper->changepar(9,(int)o->value())}
   }
   Fl_Button looper_play {
     label {@|>}
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(272);
+ m_parent->getMIDIControl(MC_Looper_Play);
  return;
 }
-rkr->efx_Looper->changepar(1,(int)o->value());
-rgui->update_looper();}
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Play,(int)o->value());
+m_parent->update_looper();}
     tooltip {Play - Shortcut 'F5'} xywh {8 117 44 22} type Toggle shortcut 0xffc2
     code0 {o->set_label_offset(4);}
     class RKR_Button
   }
   Fl_Button looper_stop {
     label {@||}
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(273);
+ m_parent->getMIDIControl(MC_Looper_Stop);
  return;
 }
-rkr->efx_Looper->changepar(2,(int)o->value());
-rgui->update_looper();}
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Stop,(int)o->value());
+m_parent->update_looper();}
     tooltip {Stop - Shortcut 'F6'} xywh {59 117 44 22} type Toggle shortcut 0xffc3
     code0 {o->set_label_offset(4);}
     class RKR_Button
   }
   Fl_Button looper_record {
     label {@circle}
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(274);
+ m_parent->getMIDIControl(MC_Looper_Record);
  return;
 }
-rkr->efx_Looper->changepar(3,(int)o->value());
-rgui->update_looper();}
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Record,(int)o->value());
+m_parent->update_looper();}
     xywh {109 117 44 22} type Toggle labelcolor 1
     code0 {o->set_label_offset(4);}
     class RKR_Button
@@ -220,78 +221,71 @@ rgui->update_looper();}
   }
   Fl_Check_Button looper_r1 {
     label R1
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(275);
+ m_parent->getMIDIControl(MC_Looper_Rec_1);
  return;
 }
-rkr->efx_Looper->changepar(11,(int)o->value())}
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Rec_1,(int)o->value())}
     tooltip {Record on Track 1} xywh {8 153 15 15} down_box BORDER_BOX labelsize 10 labelcolor 7 align 1
     class RKR_Check_Button
   }
   Fl_Check_Button looper_r2 {
     label R2
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(276);
+ m_parent->getMIDIControl(MC_Looper_Rec_2);
  return;
 }
-rkr->efx_Looper->changepar(12,(int)o->value())}
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Rec_2,(int)o->value())}
     tooltip {Record on Track 2} xywh {27 153 15 15} down_box BORDER_BOX labelsize 10 labelcolor 7 align 1
     class RKR_Check_Button
   }
   Fl_Button looper_t1 {
     label 1
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(277);
+ m_parent->getMIDIControl(MC_Looper_Track_1);
  return;
 }
-rkr->efx_Looper->changepar(7,(int)o->value());
-rgui->update_looper();}
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Track_1,(int)o->value());
+m_parent->update_looper();}
     tooltip {Enable Play, Stop, Record on Track 1} xywh {111 147 18 18} type Toggle labelsize 10 align 16
     class RKR_Button
   }
   Fl_Button looper_t2 {
     label 2
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(278);
+ m_parent->getMIDIControl(MC_Looper_Track_2);
  return;
 }
-rkr->efx_Looper->changepar(8,(int)o->value());
-rgui->update_looper();}
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Track_2,(int)o->value());
+m_parent->update_looper();}
     tooltip {Enable Play, Stop, Record on Track 2} xywh {134 147 18 18} type Toggle labelsize 10 align 16
     class RKR_Button
   }
   Fl_Check_Button looper_lnk {
     label Lnk
-    user_data 2
-    callback {rkr->efx_Looper->changepar(13,(int)o->value())}
+    callback {m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Link,(int)o->value())}
     tooltip {Link track 1 and track 2 with the same length} xywh {27 167 15 15} down_box BORDER_BOX labelsize 10 labelcolor 7 align 4
     class RKR_Check_Button
   }
   Fl_Button looper_clear {
     label Clear
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(279);
+ m_parent->getMIDIControl(MC_Looper_Clear);
  return;
 }
-rkr->efx_Looper->changepar(4,(int)o->value());
-rgui->update_looper();} selected
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Clear,(int)o->value());
+m_parent->update_looper();}
     tooltip {Erase the Selected Track} xywh {46 165 43 14} labelsize 10
     class RKR_Button
   }
   Fl_Check_Button looper_mt {
     label M
-    user_data 2
-    callback {rkr->efx_Looper->changepar(16,(int)o->value())}
+    callback {m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Metro,(int)o->value())}
     tooltip Metronome xywh {93 167 27 15} down_box BORDER_BOX labelsize 10 labelcolor 7
     class RKR_Check_Button
   }
@@ -302,5 +296,70 @@ rgui->update_looper();} selected
   decl {CommonGuiMenu *m_looper_bar;} {private local
   }
   decl {CommonGuiMenu *m_looper_ms;} {private local
+  }
+  Function {parameter_refresh(int index)} {return_type void
+  } {
+    code {switch(index)
+    {
+    case Looper_DryWet:
+        looper_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_DryWet)));
+        break;
+    case Looper_Level_1:
+        looper_level1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Level_1));
+        break;
+    case Looper_Level_2:
+        looper_level2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Level_2));
+        break;
+    case Looper_Reverse:
+        looper_rv->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Reverse));
+        break;
+    case Looper_AutoPlay:
+        looper_ap->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_AutoPlay));
+        break;
+    case Looper_Play:
+        looper_play->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Play));
+        m_parent->update_looper();
+        break;
+    case Looper_Stop:
+        looper_stop->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Stop));
+        m_parent->update_looper();
+        break;
+    case Looper_Record:
+        looper_record->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Record));
+        m_parent->update_looper();
+        break;
+    case Looper_Rec_1:
+        looper_r1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Rec_1));
+        break;
+    case Looper_Rec_2:
+        looper_r2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Rec_2));
+        break;
+    case Looper_Track_1:
+        looper_t1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Track_1));
+        m_parent->update_looper();
+        break;
+    case Looper_Track_2:
+        looper_t2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Track_2));
+        m_parent->update_looper();
+        break;
+    case Looper_Clear:
+        /* Setting the looper_clear button after MIDI control really does not work. 
+           The button for the gui is just press and release, i.e. not a toggle button.
+           Since the clear flag Pclear is set and remains set until another button such
+           as play or record gets pushed, the Pclear variable returned by getpar(4) is
+           going to show pressed (value = 1) and set the button as pressed here. And it
+           will remain in that state until restart. If pressed manually, it just does
+           unpress and release back to press.  Would be nice to show the press and release
+           with MIDI control, but it would probably have to be a timer issue and additional
+           complications for very little value. MIDI control does work, but we should not show
+           it on the gui button here with this method */
+    //    looper_clear->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Clear));
+        m_parent->update_looper();
+        break;
+    }} {}
+  }
+  Function {tap_tempo_update()} {return_type void
+  } {
+    code {looper_Tempo->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Tempo));} {}
   }
 }

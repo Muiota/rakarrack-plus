@@ -89,11 +89,26 @@ have_signal(float* efxoutl, float* efxoutr, uint32_t period)
 static void
 check_shared_buf(RKRLV2* plug, uint32_t nframes)
 {
+#if 0
+    // This crashes non-mixer sometimes
     if(nframes > MAX_INPLACE)
     {
         return;
     }
+#else
+    // This original from rkrlv2 works for all
+    if(nframes > plug->period_max)
+    {
+        if(plug->tmp_l)
+            free(plug->tmp_l);
+
+        if(plug->tmp_r)
+            free(plug->tmp_r);
     
+        plug->tmp_l = (float*)malloc(sizeof(float)*nframes);
+        plug->tmp_r = (float*)malloc(sizeof(float)*nframes);
+    }
+#endif
     if(plug->input_l_p == plug->output_l_p )
     {
         memcpy(plug->tmp_l,plug->input_l_p,sizeof(float)*nframes);
@@ -254,9 +269,16 @@ void getFeatures(RKRLV2* plug, const LV2_Feature * const* host_features)
     plug->file_changed = 0;
     plug->scheduler = 0;
     plug->urid_map = 0;
+    plug->URIDs.bufsz_max = 0;  // for valgrind
+    plug->URIDs.atom_Int = 0;   // for valgrind
+
     for(i=0; host_features[i]; i++)
-    { if(!strcmp(host_features[i]->URI,LV2_OPTIONS__options)) { LV2_Options_Option* option; option = (LV2_Options_Option*)host_features[i]->data;
-            for(j=0; option[j].key; j++)
+    {
+        if(!strcmp(host_features[i]->URI,LV2_OPTIONS__options))
+        { 
+            LV2_Options_Option* option; option = (LV2_Options_Option*)host_features[i]->data;
+
+            for(j = 0; option[j].key; j++)
             {
                 if(option[j].key == plug->URIDs.bufsz_max)
                 {
@@ -305,13 +327,13 @@ LV2_Handle init_eqlv2(const LV2_Descriptor* /* descriptor */,double sample_freq,
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 12;
+    plug->nparams = C_EQ_PARAMETERS;
     plug->effectindex = IEQ;
     plug->prev_bypass = 1;
 
     getFeatures(plug,host_features);
 
-    plug->eq = new EQ(EQ1_REGULAR, sample_freq, plug->period_max);
+    plug->eq = new EQ(sample_freq, plug->period_max);
 
     return plug;
 }
@@ -320,9 +342,6 @@ void run_eqlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -338,32 +357,62 @@ void run_eqlv2(LV2_Handle handle, uint32_t nframes)
     if(plug->period_max != nframes)
     {
         plug->period_max = nframes;
-        plug->eq->lv2_update_params(EQ1_REGULAR, nframes);
+        plug->eq->lv2_update_params(nframes);
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i = 0;
-    val = (int)*plug->param_p[0]+64;//gain
-    if(plug->eq->getpar(0) != val)
+    int val = 0;
+    int param_case_offset = 10;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->eq->changepar(0,val);
-    }
-    val = (int)*plug->param_p[1]+64;//q
-    if(plug->eq->getpar(13) != val)
-    {
-        int j;
-        for(j=0; j<10; j++)
+        switch(param_case_offset)
         {
-            plug->eq->changepar(j*5+13,val);
-        }
-    }
-    for(i=2; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i]+64;//various freq. bands
-        if(plug->eq->getpar(5*i + 2) != val)
-        {
-            plug->eq->changepar(5*i+2,val);
+            case EQ_Gain:   // 0
+            {
+                val = (int)*plug->param_p[i] + 64;
+                if(plug->eq->getpar(EQ_Gain) != val)
+                {
+                    plug->eq->changepar(EQ_Gain,val);
+                }
+
+                param_case_offset = EQ_Q; // set for EQ_Q
+            }
+            break;
+
+            case EQ_Q:      // 1
+            {
+                val = (int)*plug->param_p[i] + 64;
+                if(plug->eq->getpar(EQ_Q) != val)
+                {
+                    plug->eq->changepar(EQ_Q, val);
+                }
+
+                param_case_offset = EQ_31_HZ;   // set for EQ_31_HZ
+            }
+            break;
+            
+            case EQ_31_HZ:  // = 2
+            case EQ_63_HZ:
+            case EQ_125_HZ:
+            case EQ_250_HZ:
+            case EQ_500_HZ:
+            case EQ_1_KHZ:
+            case EQ_2_KHZ:
+            case EQ_4_KHZ:
+            case EQ_8_KHZ:
+            case EQ_16_KHZ: // 9
+            {
+                val = (int)*plug->param_p[i] + 64;
+                if(plug->eq->getpar(param_case_offset) != val)
+                {
+                    plug->eq->changepar(param_case_offset, val);
+                }
+
+                param_case_offset++;     // next parameter
+            }
+            break;
         }
     }
 
@@ -385,7 +434,7 @@ LV2_Handle init_complv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 9;
+    plug->nparams = C_COMPRESS_PARAMETERS;
     plug->effectindex = ICOMP;
     plug->prev_bypass = 1;
     
@@ -400,9 +449,6 @@ void run_complv2(LV2_Handle handle, uint32_t nframes)
     if( nframes == 0)
         return;
     
-    int i;
-    int val;
-
     RKRLV2* plug = (RKRLV2*)handle;
     
     inline_check(plug, nframes);
@@ -423,12 +469,29 @@ void run_complv2(LV2_Handle handle, uint32_t nframes)
     // we are good to run now
 
     //check and set changed parameters
-    for(i=0; i<plug->nparams; i++)
+    int val = 0;
+
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->comp->getpar(i+1) != val)//this effect is 1 indexed
+        switch(i)
         {
-            plug->comp->changepar(i+1,val);
+            case Compress_Threshold:
+            case Compress_Ratio:
+            case Compress_Output:
+            case Compress_Attack:
+            case Compress_Release:
+            case Compress_Auto_Out:
+            case Compress_Knee:
+            case Compress_Stereo:
+            case Compress_Peak:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->comp->getpar(i) != val)
+                {
+                    plug->comp->changepar(i, val);
+                }
+            }
+            break;
         }
     }
 
@@ -450,7 +513,7 @@ LV2_Handle init_distlv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 12;
+    plug->nparams = (C_DIST_PARAMETERS - 1); // -1 for skipped parameter 11
     plug->effectindex = IDIST;
     plug->prev_bypass = 1;
 
@@ -469,9 +532,6 @@ void run_distlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -492,31 +552,74 @@ void run_distlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->dist->getpar(i) != val)
+    int val = 0;
+    int param_case_offset = 0;
+    
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->dist->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i]+64;//1 pan
-    if(plug->dist->getpar(i) != val)
-    {
-        plug->dist->changepar(i,val);
-    }
-    for(i++; i<plug->nparams-1; i++) //2-10
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->dist->getpar(i) != val)
+        switch(param_case_offset)
         {
-            plug->dist->changepar(i,val);
+            // Normal processing
+            case Dist_LR_Cross:
+            case Dist_Drive:
+            case Dist_Level:
+            case Dist_Type:
+            case Dist_Negate:
+            case Dist_LPF:
+            case Dist_HPF:
+            case Dist_Stereo:
+            case Dist_Suboctave:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->dist->getpar(param_case_offset) != val)
+                {
+                    plug->dist->changepar(param_case_offset,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Dist_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->dist->getpar(Dist_DryWet) != val)
+                {
+                    plug->dist->changepar(Dist_DryWet,val);
+                }
+            }
+            break;
+            
+            // Offset
+            case Dist_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;    // offset
+                if(plug->dist->getpar(Dist_Pan) != val)
+                {
+                    plug->dist->changepar(Dist_Pan,val);
+                }
+            }
+            break;
+            
+            // Skip 1 parameter after this
+            case Dist_Prefilter:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->dist->getpar(Dist_Prefilter) != val)
+                {
+                    plug->dist->changepar(Dist_Prefilter,val);
+                }
+
+                // increment for skipped Dist_SKIP_11
+                param_case_offset++;
+            }
+            break;
+            
         }
-    }
-    val = (int)*plug->param_p[i++];//skip one index, 12 octave
-    if(plug->dist->getpar(i) != val)
-    {
-        plug->dist->changepar(i,val);
+        // increment offset
+        param_case_offset++;
     }
 
     //now run
@@ -540,7 +643,7 @@ LV2_Handle init_echolv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 9;
+    plug->nparams = C_ECHO_PARAMETERS;
     plug->effectindex = IECHO;
     plug->prev_bypass = 1;
     
@@ -559,9 +662,6 @@ void run_echolv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -582,26 +682,51 @@ void run_echolv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->echo->getpar(i) != val)
-    {
-        plug->echo->changepar(i,val);
-    }
-    i++;//panning is offset
-    val = (int)*plug->param_p[i]+64;
-    if(plug->echo->getpar(i) != val)
-    {
-        plug->echo->changepar(i,val);
-    }
 
-    for(i++; i<plug->nparams; i++)
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->echo->getpar(i) != val)
+        switch(i)
         {
-            plug->echo->changepar(i,val);
+            // Normal processing
+            case Echo_Delay:
+            case Echo_LR_Delay:
+            case Echo_LR_Cross:
+            case Echo_Feedback:
+            case Echo_Damp:
+            case Echo_Reverse:
+            case Echo_Direct:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->echo->getpar(i) != val)
+                {
+                    plug->echo->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Echo_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->echo->getpar(Echo_DryWet) != val)
+                {
+                    plug->echo->changepar(Echo_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Echo_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->echo->getpar(Echo_Pan) != val)
+                {
+                    plug->echo->changepar(Echo_Pan,val);
+                }
+            }
         }
     }
 
@@ -626,7 +751,7 @@ LV2_Handle init_choruslv2(const LV2_Descriptor* /* descriptor */,double sample_f
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 12;
+    plug->nparams = (C_CHORUS_PARAMETERS - 1);  // -1 skip Chorus_SKIP_Flange_10
     plug->effectindex = ICHORUS;
     plug->prev_bypass = 1;
     
@@ -645,9 +770,6 @@ void run_choruslv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -668,35 +790,71 @@ void run_choruslv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->chorus->getpar(i) != val)
+    int val = 0;
+    int param_case_offset = 0;
+    
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->chorus->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] +64;// 1 pan offset
-    if(plug->chorus->getpar(i) != val)
-    {
-        plug->chorus->changepar(i,val);
-    }
-    for(i++; i<10; i++) // 2-9
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->chorus->getpar(i) != val)
+        switch(param_case_offset)
         {
-            plug->chorus->changepar(i,val);
+            // Normal processing
+            case Chorus_LFO_Tempo:
+            case Chorus_LFO_Random:
+            case Chorus_LFO_Type:
+            case Chorus_LFO_Stereo:
+            case Chorus_Depth:
+            case Chorus_Delay:
+            case Chorus_Feedback:
+            case Chorus_Subtract:
+            case Chorus_Intense:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->chorus->getpar(param_case_offset) != val)
+                {
+                    plug->chorus->changepar(param_case_offset,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Chorus_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->chorus->getpar(Chorus_DryWet) != val)
+                {
+                    plug->chorus->changepar(Chorus_DryWet,val);
+                }
+            }
+            break;
+            
+            // Offset
+            case Chorus_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64; // offset
+                if(plug->chorus->getpar(Chorus_Pan) != val)
+                {
+                    plug->chorus->changepar(Chorus_Pan,val);
+                }
+            }
+            break;
+            
+            // Skip after this one
+            case Chorus_LR_Cross:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->chorus->getpar(Chorus_LR_Cross) != val)
+                {
+                    plug->chorus->changepar(Chorus_LR_Cross,val);
+                }
+                // increment for skipped parameter
+                param_case_offset++;
+            }
+            break;
         }
-    }
-    //skip param 10
-    for(; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->chorus->getpar(i+1) != val)
-        {
-            plug->chorus->changepar(i+1,val);
-        }
+        param_case_offset++;
     }
 
     //now run
@@ -720,7 +878,7 @@ LV2_Handle init_aphaselv2(const LV2_Descriptor* /* descriptor */,double sample_f
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 13;
+    plug->nparams = C_APHASER_PARAMETERS;
     plug->effectindex = IAPHASE;
     plug->prev_bypass = 1;
     
@@ -739,9 +897,6 @@ void run_aphaselv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -762,33 +917,57 @@ void run_aphaselv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->aphase->getpar(i) != val)
-    {
-        plug->aphase->changepar(i,val);
-    }
     
-    for(i++; i<7; i++) //1-6
+    //check and set changed parameters
+    int val = 0;
+    
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->aphase->getpar(i) != val)
+        switch(i)
         {
-            plug->aphase->changepar(i,val);
-        }
-    }
-    val = (int)*plug->param_p[i] +64;// 7 Fb offset
-    if(plug->aphase->getpar(i) != val)
-    {
-        plug->aphase->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->aphase->getpar(i) != val)
-        {
-            plug->aphase->changepar(i,val);
+            // Normal processing
+            case APhase_Distortion:
+            case APhase_LFO_Tempo:
+            case APhase_LFO_Random:
+            case APhase_LFO_Type:
+            case APhase_LFO_Stereo:
+            case APhase_Width:
+            case APhase_Stages:
+            case APhase_Mismatch:
+            case APhase_Subtract:
+            case APhase_Depth:
+            case APhase_Hyper:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->aphase->getpar(i) != val)
+                {
+                    plug->aphase->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case APhase_DryWet: 
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->aphase->getpar(APhase_DryWet) != val)
+                {
+                    plug->aphase->changepar(APhase_DryWet,val);
+                }
+            }
+            break;
+            
+            // Offset
+            case APhase_Feedback:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->aphase->getpar(APhase_Feedback) != val)
+                {
+                    plug->aphase->changepar(APhase_Feedback,val);
+                }
+            }
+            break;
         }
     }
 
@@ -813,7 +992,7 @@ LV2_Handle init_harmnomidlv2(const LV2_Descriptor* /* descriptor */,double sampl
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 10;
+    plug->nparams = (C_HARM_PARAMETERS - 1); // -1 for Harm_MIDI - since this is no MIDI
     plug->effectindex = IHARM_NM;
     plug->prev_bypass = 1;
 
@@ -829,8 +1008,8 @@ LV2_Handle init_harmnomidlv2(const LV2_Descriptor* /* descriptor */,double sampl
     plug->noteID->setlpf(5500); // default user option in rakarrack
     plug->noteID->sethpf(80); // default user option in rakarrack
 
-    plug->comp = new Compressor(sample_freq, plug->period_max);
-    plug->comp->setpreset(0,4); //Final Limiter
+    plug->comp = new Limiter(sample_freq, plug->period_max);
+    plug->comp->setpreset(0); //Final Limiter
     
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
@@ -852,9 +1031,6 @@ void run_harmnomidlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -871,8 +1047,10 @@ void run_harmnomidlv2(LV2_Handle handle, uint32_t nframes)
     if(plug->prev_bypass)
     {
         plug->harm->cleanup();
-        plug->harm->changepar(3,plug->harm->getpar(3)); // update parameters after cleanup - interval
-        plug->chordID->cc = 1; //mark chord has changed to update parameters after cleanup
+        // update parameters after cleanup - interval
+        plug->harm->changepar(Harm_Interval,plug->harm->getpar(Harm_Interval));
+        //mark chord has changed to update parameters after cleanup
+        plug->chordID->cc = 1;
     }
  
     /* adjust for possible variable nframes */
@@ -885,69 +1063,94 @@ void run_harmnomidlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->harm->getpar(i) != val)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->harm->changepar(i,val);
-    }
-    for(i++; i<3; i++) //1-2
-    {
-        val = (int)*plug->param_p[i] + 64;
-        if(plug->harm->getpar(i) != val)
+        switch(i)
         {
-            plug->harm->changepar(i,val);
-        }
-    }
-    val = (int)*plug->param_p[i] + 12;// 3 interval
-    if(plug->harm->getpar(i) != val)
-    {
-        plug->harm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];//4 filter freq
-    if(plug->harm->getpar(i) != val)
-    {
-        plug->harm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];//5 select mode
-    if(plug->harm->getpar(i) != val)
-    {
-        plug->harm->changepar(i,val);
-        plug->chordID->cleanup();
-        if(!val) plug->harm->changepar(3,plug->harm->getpar(3)); // Reset interval
+            // Normal processing
+            case Harm_Filter_Freq:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->harm->getpar(i) != val)
+                {
+                    plug->harm->changepar(i,val);
+                }
+            }
+            break;
+            
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Harm_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->harm->getpar(Harm_DryWet) != val)
+                {
+                    plug->harm->changepar(Harm_DryWet,val);
+                }
+            }
+            break;
 
-        plug->chordID->cc = 1;//mark chord has changed to update parameters after cleanup
-    }
-    for(i++; i<8; i++) //6-7
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->harm->getpar(i) != val)
-        {
-            plug->harm->changepar(i,val);
-        //    plug->chordID->ctipo = plug->harm->getpar(7);//set chord type
-        //    plug->chordID->fundi = plug->harm->getpar(6);//set root note
-            plug->chordID->cc = 1;//mark chord has changed
-        }
-    }
-    for(; i<10; i++) // 8-9
-    {
-        val = (int)*plug->param_p[i] + 64;
-        if(plug->harm->getpar(i) != val)
-        {
-            plug->harm->changepar(i,val);
-        }
-    }
 
-// midi mode, not implementing midi here
-//    val = (int)*plug->param_p[i];// 10 midi mode
-//    if(plug->aphase->getpar(i) != val)
-//    {
-//        plug->aphase->changepar(i,val);
-//        if(!val) plug->harm->changepar(3,plug->harm->getpar(3));
-//    }
+            // Offset 64
+            case Harm_Pan:
+            case Harm_Gain:
+            case Harm_Filter_Gain:
+            case Harm_Filter_Q:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->harm->getpar(i) != val)
+                {
+                    plug->harm->changepar(i,val);
+                }
+            }
+            break;
+
+            // Offset 12
+            case Harm_Interval:
+            {
+                val = (int)*plug->param_p[i] + 12;  // offset
+                if(plug->harm->getpar(Harm_Interval) != val)
+                {
+                    plug->harm->changepar(Harm_Interval,val);
+                }
+            }
+            break;
+            
+            // Select Mode
+            case Harm_Select:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->harm->getpar(i) != val)
+                {
+                    plug->harm->changepar(i,val);
+                    plug->chordID->cleanup();
+                    if(!val) plug->harm->changepar(Harm_Interval,plug->harm->getpar(Harm_Interval)); // Reset 
+
+                    plug->chordID->cc = 1;  // mark chord changed to update after cleanup
+                }
+            }
+            break;
+
+            // Note and Chord
+            case Harm_Note:
+            case Harm_Chord:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->harm->getpar(i) != val)
+                {
+                    plug->harm->changepar(i,val);
+                //    plug->chordID->ctipo = plug->harm->getpar(7);//set chord type
+                //    plug->chordID->fundi = plug->harm->getpar(6);//set root note
+                    plug->chordID->cc = 1;  // mark chord has changed
+                }
+            }
+            break;
+        }
+    }
 
 /*
 see Chord() in rkr.fl
@@ -967,7 +1170,7 @@ see process.C ln 1507
                     if(plug->noteID->afreq > 0.0)
                     {
                         plug->chordID->Vamos(0,plug->harm->Pinterval - 12,plug->noteID->reconota);
-                        plug->harm->r_ratio = plug->chordID->r__ratio[0];//pass the found ratio
+                        plug->harm->r_ratio = plug->chordID->r__ratio[0];   // pass the found ratio
                         plug->noteID->last = plug->noteID->reconota;
                     }
                 }
@@ -980,10 +1183,10 @@ see process.C ln 1507
         if (plug->chordID->cc) 
         {
             plug->chordID->cc = 0;
-            plug->chordID->ctipo = plug->harm->getpar(7);//set chord type
-            plug->chordID->fundi = plug->harm->getpar(6);//set root note
+            plug->chordID->ctipo = plug->harm->getpar(Harm_Chord);  // set chord type
+            plug->chordID->fundi = plug->harm->getpar(Harm_Note);   // set root note
             plug->chordID->Vamos(0,plug->harm->Pinterval - 12,plug->noteID->reconota);
-            plug->harm->r_ratio = plug->chordID->r__ratio[0];//pass the found ratio
+            plug->harm->r_ratio = plug->chordID->r__ratio[0];       // pass the found ratio
         }
         plug->comp->out(plug->output_l_p,plug->output_r_p);
     }
@@ -1005,7 +1208,7 @@ LV2_Handle init_exciterlv2(const LV2_Descriptor* /* descriptor */,double sample_
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 13;
+    plug->nparams = C_EXCITER_PARAMETERS;
     plug->effectindex = IEXCITER;
     plug->prev_bypass = 1;
 
@@ -1020,9 +1223,6 @@ void run_exciterlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1042,13 +1242,35 @@ void run_exciterlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    for(i=0; i<plug->nparams; i++)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->exciter->getpar(i) != val)
+        switch(i)
         {
-            plug->exciter->changepar(i,val);
+            // Normal processing
+            case Exciter_Gain:
+            case Exciter_Harm_1:
+            case Exciter_Harm_2:
+            case Exciter_Harm_3:
+            case Exciter_Harm_4:
+            case Exciter_Harm_5:
+            case Exciter_Harm_6:
+            case Exciter_Harm_7:
+            case Exciter_Harm_8:
+            case Exciter_Harm_9:
+            case Exciter_Harm_10:
+            case Exciter_LPF:
+            case Exciter_HPF:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->exciter->getpar(i) != val)
+                {
+                    plug->exciter->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -1070,7 +1292,7 @@ LV2_Handle init_panlv2(const LV2_Descriptor* /* descriptor */,double sample_freq
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 9;
+    plug->nparams = C_PAN_PARAMETERS;
     plug->effectindex = IPAN;
     plug->prev_bypass = 1;
     
@@ -1089,9 +1311,6 @@ void run_panlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1112,26 +1331,52 @@ void run_panlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->pan->getpar(i) != val)
-    {
-        plug->pan->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] + 64;// 1 pan
-    if(plug->pan->getpar(i) != val)
-    {
-        plug->pan->changepar(i,val);
-    }
 
-    for(i++; i<plug->nparams; i++) //2-8
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->pan->getpar(i) != val)
+        switch(i)
         {
-            plug->pan->changepar(i,val);
+            // Normal processing
+            case Pan_LFO_Tempo:
+            case Pan_LFO_Random:
+            case Pan_LFO_Type:
+            case Pan_LFO_Stereo:
+            case Pan_Ex_St_Amt:
+            case Pan_AutoPan:
+            case Pan_Enable_Extra:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->pan->getpar(i) != val)
+                {
+                    plug->pan->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Pan_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->pan->getpar(Pan_DryWet) != val)
+                {
+                    plug->pan->changepar(Pan_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Pan_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->pan->getpar(Pan_Pan) != val)
+                {
+                    plug->pan->changepar(Pan_Pan,val);
+                }
+            }
+            break;
         }
     }
 
@@ -1156,7 +1401,7 @@ LV2_Handle init_alienlv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 11;
+    plug->nparams = C_ALIENWAH_PARAMETERS;
     plug->effectindex = IAWAH;
     plug->prev_bypass = 1;
     
@@ -1176,9 +1421,6 @@ void run_alienlv2(LV2_Handle handle, uint32_t nframes)
     if( nframes == 0)
         return;
     
-    int i;
-    int val;
-
     RKRLV2* plug = (RKRLV2*)handle;
     
     check_shared_buf(plug,nframes);
@@ -1198,29 +1440,58 @@ void run_alienlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+    
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);//0 Wet/Dry
-    if(plug->alien->getpar(i) != val)
+    int val = 0;
+    
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->alien->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] +64;// 1 pan is offset
-    if(plug->alien->getpar(i) != val)
-    {
-        plug->alien->changepar(i,val);
-    }
-
-    for(i++; i<plug->nparams; i++) //2-10
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->alien->getpar(i) != val)
+        switch(i)
         {
-            plug->alien->changepar(i,val);
+            // Normal processing
+            case Alien_LFO_Tempo:
+            case Alien_LFO_Random:
+            case Alien_LFO_Type:
+            case Alien_LFO_Stereo:
+            case Alien_Depth:
+            case Alien_Feedback:
+            case Alien_Delay:
+            case Alien_LR_Cross:
+            case Alien_Phase:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->alien->getpar(i) != val)
+                {
+                    plug->alien->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Alien_DryWet: 
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->alien->getpar(Alien_DryWet) != val)
+                {
+                    plug->alien->changepar(Alien_DryWet,val);
+                }
+            }
+            break;
+            
+            // Offset
+            case Alien_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;   // offset
+                if(plug->alien->getpar(Alien_Pan) != val)
+                {
+                    plug->alien->changepar(Alien_Pan,val);
+                }
+            }
+            break;
         }
     }
-
+    
     //now run
     plug->alien->out(plug->output_l_p, plug->output_r_p);
 
@@ -1242,7 +1513,7 @@ LV2_Handle init_revelv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 10;
+    plug->nparams = (C_REVERB_PARAMETERS - 2); // -2 skips 5 & 6 unused
     plug->effectindex = IREV;
     plug->prev_bypass = 1;
 
@@ -1261,9 +1532,6 @@ void run_revelv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1284,34 +1552,67 @@ void run_revelv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->reve->getpar(i) != val)
+    int val = 0;
+    int param_case_offset = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->reve->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] +64;// 1 pan is offset
-    if(plug->reve->getpar(i) != val)
-    {
-        plug->reve->changepar(i,val);
-    }
-    for(i++; i<5; i++) //2-4
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->reve->getpar(i) != val)
+        switch(param_case_offset)
         {
-            plug->reve->changepar(i,val);
+            // Normal processing
+            case Reverb_Time:
+            case Reverb_I_Delay:
+            case Reverb_LPF:
+            case Reverb_HPF:
+            case Reverb_Damp:
+            case Reverb_Type:
+            case Reverb_Room:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->reve->getpar(param_case_offset) != val)
+                {
+                    plug->reve->changepar(param_case_offset,val);
+                }
+            }
+            break;
+
+            // wet/dry -> dry/wet reversal
+            case Reverb_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->reve->getpar(Reverb_DryWet) != val)
+                {
+                    plug->reve->changepar(Reverb_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Reverb_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->reve->getpar(Reverb_Pan) != val)
+                {
+                    plug->reve->changepar(Reverb_Pan,val);
+                }
+            }
+            break;
+
+            // Skip after
+            case Reverb_Delay_FB:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->reve->getpar(param_case_offset) != val)
+                {
+                    plug->reve->changepar(param_case_offset,val);
+                }
+                param_case_offset += 2; // Skip 5 & 6
+            }
+            break;
         }
-    }
-    for(; i<plug->nparams; i++) //7-11 (5 and 6 are skipped
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->reve->getpar(i+2) != val)
-        {
-            plug->reve->changepar(i+2,val);
-        }
+        
+        param_case_offset++;
     }
 
     //now run
@@ -1335,13 +1636,13 @@ LV2_Handle init_eqplv2(const LV2_Descriptor* /* descriptor */,double sample_freq
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 10;
+    plug->nparams = C_PARAMETRIC_EQ_PARAMETERS;
     plug->effectindex = IEQP;
     plug->prev_bypass = 1;
 
     getFeatures(plug,host_features);
 
-    plug->eq = new EQ(EQ2_PARAMETRIC, sample_freq, plug->period_max);
+    plug->peq = new ParametricEQ(sample_freq, plug->period_max);
 
     return plug;
 }
@@ -1350,9 +1651,6 @@ void run_eqplv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1368,52 +1666,71 @@ void run_eqplv2(LV2_Handle handle, uint32_t nframes)
     if(plug->period_max != nframes)
     {
         plug->period_max = nframes;
-        plug->eq->lv2_update_params(EQ2_PARAMETRIC, nframes);
+        plug->peq->lv2_update_params(nframes);
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i = 0;
+    int val = 0;
+    int param_case_offset = Parametric_Gain;
+    for(int i = 0; i < plug->nparams; i++)
+    {
+        switch(param_case_offset)
+        {
+            case Parametric_Gain:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->peq->getpar(Parametric_Gain) != val)
+                {
+                    plug->peq->changepar(Parametric_Gain,val);
+                }
 
-    val = (int)*plug->param_p[0]+64;//gain
-    if(plug->eq->getpar(0) != val)
-    {
-        plug->eq->changepar(0,val);
-    }
+                // the subsequent parameters start at 0, we add one on break
+                param_case_offset = -1;
+            }
+            break;
 
-    for(i=1; i<4; i++) //1-3 low band
-    {
-        val = (int)*plug->param_p[i]+64;
-        if(plug->eq->getpar(i + 10) != val)
-        {
-            plug->eq->changepar(i+10,val);
+            case Parametric_Low_Freq:
+            case Parametric_Mid_Freq:
+            case Parametric_High_Freq:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->peq->getpar(param_case_offset) != val)
+                {
+                    plug->peq->changepar(param_case_offset,val);
+                }
+            }
+            break;
+                
+            case Parametric_Low_Gain:
+            case Parametric_Low_Q:
+            case Parametric_Mid_Gain:
+            case Parametric_Mid_Q:
+            case Parametric_High_Gain:
+            case Parametric_High_Q:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->peq->getpar(param_case_offset) != val)
+                {
+                    plug->peq->changepar(param_case_offset,val);
+                }
+
+            }
+            break;
         }
-    }
-    for(; i<7; i++) //4-6 mid band
-    {
-        val = (int)*plug->param_p[i]+64;
-        if(plug->eq->getpar(i + 12) != val)
-        {
-            plug->eq->changepar(i+12,val);
-        }
-    }
-    for(; i<plug->nparams; i++) //7-9 high band
-    {
-        val = (int)*plug->param_p[i]+64;
-        if(plug->eq->getpar(i + 14) != val)
-        {
-            plug->eq->changepar(i+14,val);
-        }
+        
+        param_case_offset++;
     }
 
     //now run
-    plug->eq->out(plug->output_l_p, plug->output_r_p);
+    plug->peq->out(plug->output_l_p, plug->output_r_p);
 
     xfade_check(plug,nframes);
 
     if(plug->prev_bypass)
     {
-        plug->eq->cleanup();
+        plug->peq->cleanup();
     }
 
     return;
@@ -1424,7 +1741,7 @@ LV2_Handle init_cablv2(const LV2_Descriptor* /* descriptor */,double sample_freq
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 10;
+    plug->nparams = C_CABINET_PARAMETERS;  // This is not used
     plug->effectindex = ICAB;
     plug->prev_bypass = 1;
 
@@ -1439,8 +1756,6 @@ void run_cablv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1460,17 +1775,19 @@ void run_cablv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    val = (int)*plug->param_p[0]+64;//gain
-    if(plug->cab->getpar(0) != val)
+    // The parameters for gain and preset are reversed for LV2
+    int val = (int)*plug->param_p[0] + 64;
+    if(plug->cab->getpar(Cabinet_Gain) != val)
     {
-        plug->cab->changepar(0,val);
+        plug->cab->changepar(Cabinet_Gain,val);
     }
 
     val = (int)*plug->param_p[1];
-    if(plug->cab->Cabinet_Preset != val)
+    if(plug->cab->getpar(Cabinet_Preset_Idx) != val)
     {
-        plug->cab->setpreset(val);
+        plug->cab->changepar(Cabinet_Preset_Idx, val);
     }
 
     //now run
@@ -1494,7 +1811,7 @@ LV2_Handle init_mdellv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 13;
+    plug->nparams = C_MUSIC_PARAMETERS;
     plug->effectindex = IMDEL;
     plug->prev_bypass = 1;
     
@@ -1513,9 +1830,6 @@ void run_mdellv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1536,40 +1850,56 @@ void run_mdellv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->mdel->getpar(i) != val)
-    {
-        plug->mdel->changepar(i,val);
-    }
-    
-    i++;
-    val = (int)*plug->param_p[i]+64;//pan1
-    if(plug->mdel->getpar(i) != val)
-    {
-        plug->mdel->changepar(i,val);
-    }
 
-    for(i++; i<7; i++) //2-6
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->mdel->getpar(i) != val)
+        switch(i)
         {
-            plug->mdel->changepar(i,val);
-        }
-    }
-    val = (int)*plug->param_p[i]+64;//pan2
-    if(plug->mdel->getpar(i) != val)
-    {
-        plug->mdel->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++) //8-12
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->mdel->getpar(i) != val)
-        {
-            plug->mdel->changepar(i,val);
+            // Normal processing
+            case Music_Delay_1:
+            case Music_Del_Offset:
+            case Music_LR_Cross:
+            case Music_Feedback_1:
+            case Music_Damp:
+            case Music_Delay_2:
+            case Music_Feedback_2:
+            case Music_Tempo:
+            case Music_Gain_1:
+            case Music_Gain_2:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->mdel->getpar(i) != val)
+                {
+                    plug->mdel->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Music_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->mdel->getpar(Music_DryWet) != val)
+                {
+                    plug->mdel->changepar(Music_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Music_Pan_1:
+            case Music_Pan_2:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->mdel->getpar(i) != val)
+                {
+                    plug->mdel->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -1594,7 +1924,7 @@ LV2_Handle init_wahlv2(const LV2_Descriptor* /* descriptor */,double sample_freq
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 11;
+    plug->nparams = C_WAHWAH_PARAMETERS;
     plug->effectindex = IWAH;
     plug->prev_bypass = 1;
 
@@ -1613,9 +1943,6 @@ void run_wahlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1636,26 +1963,54 @@ void run_wahlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->wah->getpar(i) != val)
-    {
-        plug->wah->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] +64;// 1 pan offset
-    if(plug->wah->getpar(i) != val)
-    {
-        plug->wah->changepar(i,val);
-    }
 
-    for(i++; i<plug->nparams; i++) // 2-10
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->wah->getpar(i) != val)
+        switch(i)
         {
-            plug->wah->changepar(i,val);
+            // Normal processing
+            case WahWah_LFO_Tempo:
+            case WahWah_LFO_Random:
+            case WahWah_LFO_Type:
+            case WahWah_LFO_Stereo:
+            case WahWah_Depth:
+            case WahWah_Sense:
+            case WahWah_ASI:
+            case WahWah_Smooth:
+            case WahWah_Mode:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->wah->getpar(i) != val)
+                {
+                    plug->wah->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case WahWah_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->wah->getpar(WahWah_DryWet) != val)
+                {
+                    plug->wah->changepar(WahWah_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case WahWah_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->wah->getpar(WahWah_Pan) != val)
+                {
+                    plug->wah->changepar(WahWah_Pan,val);
+                }
+            }
+            break;
         }
     }
 
@@ -1680,7 +2035,7 @@ LV2_Handle init_derelv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 12;
+    plug->nparams = C_DERE_PARAMETERS;
     plug->effectindex = IDERE;
     plug->prev_bypass = 1;
 
@@ -1699,9 +2054,6 @@ void run_derelv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1722,25 +2074,55 @@ void run_derelv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->dere->getpar(i) != val)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->dere->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i]+64;//1 pan
-    if(plug->dere->getpar(i) != val)
-    {
-        plug->dere->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++) //2-11
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->dere->getpar(i) != val)
+        switch(i)
         {
-            plug->dere->changepar(i,val);
+            // Normal processing
+            case Dere_LR_Cross:
+            case Dere_Drive:
+            case Dere_Level:
+            case Dere_Type:
+            case Dere_Negate:
+            case Dere_LPF:
+            case Dere_HPF:
+            case Dere_Color:
+            case Dere_Prefilter:
+            case Dere_Suboctave:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->dere->getpar(i) != val)
+                {
+                    plug->dere->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Dere_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->dere->getpar(Dere_DryWet) != val)
+                {
+                    plug->dere->changepar(Dere_DryWet,val);
+                }
+            }
+            break;
+            
+            // Offset
+            case Dere_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->dere->getpar(Dere_Pan) != val)
+                {
+                    plug->dere->changepar(Dere_Pan,val);
+                }
+            }
+            break;
         }
     }
 
@@ -1765,7 +2147,7 @@ LV2_Handle init_valvelv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 13;
+    plug->nparams = C_VALVE_PARAMETERS;
     plug->effectindex = IVALVE;
     plug->prev_bypass = 1;
 
@@ -1784,9 +2166,6 @@ void run_valvelv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1807,25 +2186,56 @@ void run_valvelv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->valve->getpar(i) != val)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->valve->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i]+64;//1 pan
-    if(plug->valve->getpar(i) != val)
-    {
-        plug->valve->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++) //2-12
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->valve->getpar(i) != val)
+        switch(i)
         {
-            plug->valve->changepar(i,val);
+            // Normal processing
+            case Valve_LR_Cross:
+            case Valve_Drive:
+            case Valve_Level:
+            case Valve_Negate:
+            case Valve_LPF:
+            case Valve_HPF:
+            case Valve_Stereo:
+            case Valve_Prefilter:
+            case Valve_Distortion:
+            case Valve_Ex_Dist:
+            case Valve_Presence:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->valve->getpar(i) != val)
+                {
+                    plug->valve->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Valve_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->valve->getpar(Valve_DryWet) != val)
+                {
+                    plug->valve->changepar(Valve_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Valve_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->valve->getpar(Valve_Pan) != val)
+                {
+                    plug->valve->changepar(Valve_Pan,val);
+                }
+            }
+            break;
         }
     }
 
@@ -1850,7 +2260,7 @@ LV2_Handle init_dflangelv2(const LV2_Descriptor* /* descriptor */,double sample_
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 15;
+    plug->nparams = C_DFLANGE_PARAMETERS;
     plug->effectindex = IDFLANGE;
     plug->prev_bypass = 1;
     
@@ -1864,9 +2274,6 @@ void run_dflangelv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1886,19 +2293,48 @@ void run_dflangelv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->dflange->getpar(i) != val)
+    int val = 0;
+    
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->dflange->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++) //1-14
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->dflange->getpar(i) != val)
+        switch(i)
         {
-            plug->dflange->changepar(i,val);
+            case DFlange_Pan:
+            case DFlange_LR_Cross:
+            case DFlange_Depth:
+            case DFlange_Width:
+            case DFlange_Offset:
+            case DFlange_Feedback:
+            case DFlange_LPF:
+            case DFlange_Subtract:
+            case DFlange_Zero:
+            case DFlange_LFO_Tempo:
+            case DFlange_LFO_Stereo:
+            case DFlange_LFO_Type:
+            case DFlange_LFO_Random:
+            case DFlange_Intense:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->dflange->getpar(i) != val)
+                {
+                    plug->dflange->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case DFlange_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->dflange->getpar(DFlange_DryWet) != val)
+                {
+                    plug->dflange->changepar(DFlange_DryWet,val);
+                }
+            }
+            break;
         }
     }
 
@@ -1920,7 +2356,7 @@ LV2_Handle init_ringlv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 13;
+    plug->nparams = C_RING_PARAMETERS;
     plug->effectindex = IRING;
     plug->prev_bypass = 1;
 
@@ -1934,8 +2370,8 @@ LV2_Handle init_ringlv2(const LV2_Descriptor* /* descriptor */,double sample_fre
     plug->noteID->setlpf(5500);
     plug->noteID->sethpf(80);
 
-    plug->comp = new Compressor(sample_freq, plug->period_max);
-    plug->comp->setpreset(0,4); //Final Limiter
+    plug->comp = new Limiter(sample_freq, plug->period_max);
+    plug->comp->setpreset(0); //Final Limiter
     
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
@@ -1948,9 +2384,6 @@ void run_ringlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -1975,26 +2408,47 @@ void run_ringlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->ring->getpar(i) != val)
-    {
-        plug->ring->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];// 1 pan
-    if(plug->ring->getpar(i) != val)
-    {
-        plug->ring->changepar(i,val);
-    }
 
-    for(i++; i<plug->nparams; i++) //2-12
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->ring->getpar(i) != val)
+        switch(i)
         {
-            plug->ring->changepar(i,val);
+            // Normal processing
+            case Ring_Pan:
+            case Ring_LR_Cross:
+            case Ring_Level:
+            case Ring_Depth:
+            case Ring_Freq:
+            case Ring_Stereo:
+            case Ring_Sine:
+            case Ring_Triangle:
+            case Ring_Saw:
+            case Ring_Square:
+            case Ring_Input:
+            case Ring_Auto_Freq:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->ring->getpar(i) != val)
+                {
+                    plug->ring->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+
+            // wet/dry -> dry/wet reversal
+            case Ring_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->ring->getpar(Ring_DryWet) != val)
+                {
+                    plug->ring->changepar(Ring_DryWet,val);
+                }
+            }
+            break;
         }
     }
 //see process.C ln 1539
@@ -2039,7 +2493,7 @@ LV2_Handle init_distbandlv2(const LV2_Descriptor* /* descriptor */,double sample
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 15;
+    plug->nparams = C_DBAND_PARAMETERS;
     plug->effectindex = IDISTBAND;
     plug->prev_bypass = 1;
 
@@ -2058,9 +2512,6 @@ void run_distbandlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2081,25 +2532,58 @@ void run_distbandlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->distband->getpar(i) != val)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->distband->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i]+64;//1 pan
-    if(plug->distband->getpar(i) != val)
-    {
-        plug->distband->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++) //2-14
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->distband->getpar(i) != val)
+        switch(i)
         {
-            plug->distband->changepar(i,val);
+            // Normal processing
+            case DistBand_LR_Cross:
+            case DistBand_Drive:
+            case DistBand_Level:
+            case DistBand_Type_Low:
+            case DistBand_Type_Mid:
+            case DistBand_Type_Hi:
+            case DistBand_Gain_Low:
+            case DistBand_Gain_Mid:
+            case DistBand_Gain_Hi:
+            case DistBand_Negate:
+            case DistBand_Cross_1:
+            case DistBand_Cross_2:
+            case DistBand_Stereo:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->distband->getpar(i) != val)
+                {
+                    plug->distband->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case DistBand_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->distband->getpar(DistBand_DryWet) != val)
+                {
+                    plug->distband->changepar(DistBand_DryWet,val);
+                }
+            }
+            break;
+            
+            // Offset
+            case DistBand_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->distband->getpar(DistBand_Pan) != val)
+                {
+                    plug->distband->changepar(DistBand_Pan,val);
+                }
+            }
+            break;
         }
     }
 
@@ -2124,7 +2608,7 @@ LV2_Handle init_arplv2(const LV2_Descriptor* /* descriptor */,double sample_freq
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 11;
+    plug->nparams = C_ARPIE_PARAMETERS;
     plug->effectindex = IARPIE;
     plug->prev_bypass = 1;
     
@@ -2143,9 +2627,6 @@ void run_arplv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2167,25 +2648,53 @@ void run_arplv2(LV2_Handle handle, uint32_t nframes)
     
     // we are good to run now
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->arp->getpar(i) != val)
+    int val = 0;
+    
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->arp->changepar(i,val);
-    }
-    i++;//panning is offset
-    val = (int)*plug->param_p[i]+64;
-    if(plug->arp->getpar(i) != val)
-    {
-        plug->arp->changepar(i,val);
-    }
-
-    for(i++; i<plug->nparams; i++) //rest are not offset
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->arp->getpar(i) != val)
+        switch(i)
         {
-            plug->arp->changepar(i,val);
+            // Normal processing
+            case Arpie_Tempo:
+            case Arpie_LR_Delay:
+            case Arpie_LR_Cross:
+            case Arpie_Feedback:
+            case Arpie_Damp:
+            case Arpie_ArpeWD:
+            case Arpie_Harm:
+            case Arpie_Pattern:
+            case Arpie_Subdivision:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->arp->getpar(i) != val)
+                {
+                    plug->arp->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Arpie_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->arp->getpar(Arpie_DryWet) != val)
+                {
+                    plug->arp->changepar(Arpie_DryWet,val);
+                }
+            }
+            break;
+            
+            // Offset
+            case Arpie_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->arp->getpar(Arpie_Pan) != val)
+                {
+                    plug->arp->changepar(Arpie_Pan,val);
+                }
+            }
+            break;
         }
     }
 
@@ -2210,7 +2719,7 @@ LV2_Handle init_expandlv2(const LV2_Descriptor* /* descriptor */,double sample_f
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 7;
+    plug->nparams = C_EXPANDER_PARAMETERS;
     plug->effectindex = IEXPAND;
     plug->prev_bypass = 1;
 
@@ -2225,9 +2734,6 @@ void run_expandlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2247,13 +2753,29 @@ void run_expandlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    for(i=0; i<plug->nparams; i++)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->expand->getpar(i+1) != val)//this effect is 1 indexed
+        switch(i)
         {
-            plug->expand->changepar(i+1,val);
+            // Normal processing
+            case Expander_Threshold:
+            case Expander_Shape:
+            case Expander_Attack:
+            case Expander_Release:
+            case Expander_LPF:
+            case Expander_HPF:
+            case Expander_Gain:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->expand->getpar(i) != val)
+                {
+                    plug->expand->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -2275,7 +2797,7 @@ LV2_Handle init_shuflv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 11;
+    plug->nparams = C_SHUFFLE_PARAMETERS;
     plug->effectindex = ISHUFF;
     plug->prev_bypass = 1;
 
@@ -2294,9 +2816,6 @@ void run_shuflv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2317,20 +2836,44 @@ void run_shuflv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->shuf->getpar(i) != val)
-    {
-        plug->shuf->changepar(i,val);
-    }
 
-    for(i++; i<plug->nparams; i++) //rest are not offset
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->shuf->getpar(i) != val)
+        switch(i)
         {
-            plug->shuf->changepar(i,val);
+            // Normal processing
+            case Shuffle_Gain_L:
+            case Shuffle_Gain_ML:
+            case Shuffle_Gain_MH:
+            case Shuffle_Gain_H:
+            case Shuffle_Freq_L:
+            case Shuffle_Freq_ML:
+            case Shuffle_Freq_MH:
+            case Shuffle_Freq_H:
+            case Shuffle_Width:
+            case Shuffle_F_Band:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->shuf->getpar(i) != val)
+                {
+                    plug->shuf->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Shuffle_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->shuf->getpar(Shuffle_DryWet) != val)
+                {
+                    plug->shuf->changepar(Shuffle_DryWet,val);
+                }
+            }
+            break;
         }
     }
 
@@ -2356,7 +2899,7 @@ LV2_Handle init_synthlv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 16;
+    plug->nparams = C_SYNTHFILTER_PARAMETERS;
     plug->effectindex = ISYNTH;
     plug->prev_bypass = 1;
     
@@ -2375,9 +2918,6 @@ void run_synthlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2398,20 +2938,49 @@ void run_synthlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->synth->getpar(i) != val)
-    {
-        plug->synth->changepar(i,val);
-    }
 
-    for(i++; i<plug->nparams; i++) //1-10
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->synth->getpar(i) != val)
+        switch(i)
         {
-            plug->synth->changepar(i,val);
+            // Normal processing
+            case Synthfilter_Distort:
+            case Synthfilter_LFO_Tempo:
+            case Synthfilter_LFO_Random:
+            case Synthfilter_LFO_Type:
+            case Synthfilter_LFO_Stereo:
+            case Synthfilter_Width:
+            case Synthfilter_Feedback:
+            case Synthfilter_LPF_Stages:
+            case Synthfilter_HPF_Stages:
+            case Synthfilter_Subtract:
+            case Synthfilter_Depth:
+            case Synthfilter_Env_Sens:
+            case Synthfilter_Attack:
+            case Synthfilter_Release:
+            case Synthfilter_Offset:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->synth->getpar(i) != val)
+                {
+                    plug->synth->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Synthfilter_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->synth->getpar(Synthfilter_DryWet) != val)
+                {
+                    plug->synth->changepar(Synthfilter_DryWet,val);
+                }
+            }
+            break;
         }
     }
 
@@ -2436,7 +3005,9 @@ LV2_Handle init_varybandlv2(const LV2_Descriptor* /* descriptor */,double sample
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 14; // 15 minus legacy skipped
+    // +3 for the 4 LV2 parameters added - 1 for legacy pcombi
+    plug->nparams = (C_VARYBAND_PARAMETERS + 3);
+    
     plug->effectindex = IVBAND;
     plug->prev_bypass = 1;
 
@@ -2455,9 +3026,6 @@ void run_varybandlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2478,30 +3046,62 @@ void run_varybandlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->varyband->getpar(i) != val)
+    int val = 0;
+    int param_case_offset = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->varyband->changepar(i,val);
-    }
-
-    for(i++; i<10; i++)  // 1-9
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->varyband->getpar(i) != val)
+        switch(param_case_offset)
         {
-            plug->varyband->changepar(i,val);
-        }
-    }
+            // Normal processing
+            case VaryBand_LFO_Tempo_1:
+            case VaryBand_LFO_Type_1:
+            case VaryBand_LFO_Stereo_1:
+            case VaryBand_LFO_Tempo_2:
+            case VaryBand_LFO_Type_2:
+            case VaryBand_LFO_Stereo_2:
+            case VaryBand_Cross_1:
+            case VaryBand_Cross_2:
+            case VaryBand_Low_Band:
+            case VaryBand_Mid_Band_1:
+            case VaryBand_Mid_Band_2:
+            case VaryBand_High_Band:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->varyband->getpar(param_case_offset) != val)
+                {
+                    plug->varyband->changepar(param_case_offset,val);
+                }
+            }
+            break;
 
-    for(i=10; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->varyband->getpar(i+1) != val) // +1 = skip legacy combi setting
-        {
-            plug->varyband->changepar(i+1,val);
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case VaryBand_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->varyband->getpar(VaryBand_DryWet) != val)
+                {
+                    plug->varyband->changepar(VaryBand_DryWet,val);
+                }
+            }
+            break;
+
+            // Skip after
+            case VaryBand_Cross_3:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->varyband->getpar(VaryBand_Cross_3) != val)
+                {
+                    plug->varyband->changepar(VaryBand_Cross_3,val);
+                }
+                param_case_offset++;    // skip VaryBand_Combination (legacy)
+            }
+            break;
         }
+
+        param_case_offset++;
     }
 
     //now run
@@ -2525,7 +3125,8 @@ LV2_Handle init_mutrolv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 19;
+    // -1 for Mutro_Mode_Legacy, +2 for MuTro_AG_Mode, MuTro_Exp_Wah
+    plug->nparams = (C_MUTRO_PARAMETERS + 1);
     plug->effectindex = IMUTRO;
     plug->prev_bypass = 1;
 
@@ -2544,9 +3145,6 @@ void run_mutrolv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2567,42 +3165,77 @@ void run_mutrolv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->mutro->getpar(i) != val)
+    int val = 0;
+    int param_case_offset = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->mutro->changepar(i,val);
-    }
-    
-    for(i++; i<5; i++)  // 2 - 4
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->mutro->getpar(i) != val)
+        switch(param_case_offset)
         {
-            plug->mutro->changepar(i,val);
+            // Normal processing
+            case MuTro_Resonance:
+            case MuTro_LFO_Tempo:
+            case MuTro_LFO_Random:
+            case MuTro_LFO_Type:
+            case MuTro_Depth:
+            case MuTro_Env_Sens:
+            case MuTro_Wah:
+            case MuTro_Env_Smooth:
+            case MuTro_LowPass:
+            case MuTro_BandPass:
+            case MuTro_HighPass:
+            case MuTro_Stages:
+            case MuTro_Range:
+            case MuTro_St_Freq:
+            case MuTro_AG_Mode:
+            case MuTro_Exp_Wah:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->mutro->getpar(param_case_offset) != val)
+                {
+                    plug->mutro->changepar(param_case_offset,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case MuTro_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->mutro->getpar(MuTro_DryWet) != val)
+                {
+                    plug->mutro->changepar(MuTro_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case MuTro_LFO_Stereo:
+            {
+                val = (int)*plug->param_p[i] + 64; // offset
+                if(plug->mutro->getpar(MuTro_LFO_Stereo) != val)
+                {
+                    plug->mutro->changepar(MuTro_LFO_Stereo,val);
+                }
+            }
+            break;
+
+            // Skip after
+            case MuTro_Mod_Res:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->mutro->getpar(MuTro_Mod_Res) != val)
+                {
+                    plug->mutro->changepar(MuTro_Mod_Res,val);
+                }
+                param_case_offset += 1; // Skip: Mutro_Mode_Legacy
+            }
+            break;
         }
-    }
-    val = (int)*plug->param_p[i] +64;//5 LR delay
-    if(plug->mutro->getpar(i) != val)
-    {
-        plug->mutro->changepar(i,val);
-    }
-    for(i++; i<17; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->mutro->getpar(i) != val)
-        {
-            plug->mutro->changepar(i,val);
-        }
-    }
-    for(; i<plug->nparams; i++) //skip legacy mode and preset setting
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->mutro->getpar(i+2) != val)
-        {
-            plug->mutro->changepar(i+2,val);
-        }
+        
+        param_case_offset++;
     }
 
     //now run
@@ -2626,7 +3259,7 @@ LV2_Handle init_echoverselv2(const LV2_Descriptor* /* descriptor */,double sampl
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 10;
+    plug->nparams = C_ECHOVERSE_PARAMETERS;
     plug->effectindex = IECHOVERSE;
     plug->prev_bypass = 1;
     
@@ -2645,9 +3278,6 @@ void run_echoverselv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2668,41 +3298,53 @@ void run_echoverselv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->echoverse->getpar(i) != val)
-    {
-        plug->echoverse->changepar(i,val);
-    }
-    i++;//1 panning is offset
-    val = (int)*plug->param_p[i]+64;
-    if(plug->echoverse->getpar(i) != val)
-    {
-        plug->echoverse->changepar(i,val);
-    }
-    
-    for(i++; i<4; i++) //2,3 Delay, LR delay not offset
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->echoverse->getpar(i) != val)
-        {
-            plug->echoverse->changepar(i,val);
-        }
-    }
 
-    val = (int)*plug->param_p[i]+64;    // 4 angle is offset
-    if(plug->echoverse->getpar(i) != val)
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->echoverse->changepar(i,val);
-    }
-   
-    for(i++; i<plug->nparams; i++)  // 5-9 no offset
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->echoverse->getpar(i) != val)
+        switch(i)
         {
-            plug->echoverse->changepar(i,val);
+            // Normal processing
+            case Echoverse_Tempo:
+            case Echoverse_LR_Delay:
+            case Echoverse_Feedback:
+            case Echoverse_Damp:
+            case Echoverse_Reverse:
+            case Echoverse_Subdivision:
+            case Echoverse_Ext_Stereo:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->echoverse->getpar(i) != val)
+                {
+                    plug->echoverse->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Echoverse_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->echoverse->getpar(Echoverse_DryWet) != val)
+                {
+                    plug->echoverse->changepar(Echoverse_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Echoverse_Pan:
+            case Echoverse_Angle:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->echoverse->getpar(i) != val)
+                {
+                    plug->echoverse->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -2727,7 +3369,7 @@ LV2_Handle init_coillv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 7;
+    plug->nparams = (C_COIL_PARAMETERS - 2);  // -2  Coil_Origin, Coil_Destiny skipped
     plug->effectindex = ICOIL;
     plug->prev_bypass = 1;
 
@@ -2742,9 +3384,6 @@ void run_coillv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2764,20 +3403,47 @@ void run_coillv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = (int)*plug->param_p[i];//wet/dry
-    if(plug->coil->getpar(i) != val)
+    int val = 0;
+    int param_case_offset = 0;
+    
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->coil->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++) //skip origin and destinations
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->coil->getpar(i+2) != val)
+        switch(param_case_offset)
         {
-            plug->coil->changepar(i+2,val);
+            // Normal processing
+            case Coil_Freq_1:
+            case Coil_Q_1:
+            case Coil_Freq_2:
+            case Coil_Q_2:
+            case Coil_Tone:
+            case Coil_NeckMode:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->coil->getpar(param_case_offset) != val)
+                {
+                    plug->coil->changepar(param_case_offset,val);
+                }
+            }
+            break;
+            
+            //  Coil_Origin, Coil_Destiny, are skipped after gain
+            case Coil_Gain:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->coil->getpar(Coil_Gain) != val)
+                {
+                    plug->coil->changepar(Coil_Gain,val);
+                }
+
+                // skip Coil_Origin, Coil_Destiny
+                param_case_offset += 2;
+            }
+            break;
         }
+        
+        param_case_offset++;
     }
 
     //now run
@@ -2798,7 +3464,7 @@ LV2_Handle init_shelflv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 5;
+    plug->nparams = C_SHELF_PARAMETERS;
     plug->effectindex = ISHELF;
     plug->prev_bypass = 1;
 
@@ -2813,9 +3479,6 @@ void run_shelflv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2835,13 +3498,27 @@ void run_shelflv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    for(i=0; i<plug->nparams; i++)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->shelf->getpar(i) != val)
+        switch(i)
         {
-            plug->shelf->changepar(i,val);
+            // Normal processing
+            case Shelf_Gain:
+            case Shelf_Presence:
+            case Shelf_Tone:
+            case Shelf_Stereo:
+            case Shelf_Level:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->shelf->getpar(i) != val)
+                {
+                    plug->shelf->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -2863,7 +3540,7 @@ LV2_Handle init_voclv2(const LV2_Descriptor* /* descriptor */,double sample_freq
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 7;
+    plug->nparams = C_VOCODER_PARAMETERS;
     plug->effectindex = IVOC;
     plug->prev_bypass = 1;
 
@@ -2883,9 +3560,6 @@ void run_voclv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2906,25 +3580,50 @@ void run_voclv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->voc->getpar(i) != val)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->voc->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i]+64;//pan
-    if(plug->voc->getpar(i) != val)
-    {
-        plug->voc->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->voc->getpar(i) != val)
+        switch(i)
         {
-            plug->voc->changepar(i,val);
+            // Normal processing
+            case Vocoder_Smear:
+            case Vocoder_Q:
+            case Vocoder_Input:
+            case Vocoder_Level:
+            case Vocoder_Ring:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->voc->getpar(i) != val)
+                {
+                    plug->voc->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Vocoder_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->voc->getpar(Vocoder_DryWet) != val)
+                {
+                    plug->voc->changepar(Vocoder_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Vocoder_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->voc->getpar(Vocoder_Pan) != val)
+                {
+                    plug->voc->changepar(Vocoder_Pan,val);
+                }
+            }
+            break;
         }
     }
 
@@ -2955,7 +3654,7 @@ LV2_Handle init_suslv2(const LV2_Descriptor* /* descriptor */,double sample_freq
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
     
-    plug->nparams = 2;
+    plug->nparams = C_SUSTAIN_PARAMETERS;
     plug->effectindex = ISUS;
     plug->prev_bypass = 1;
 
@@ -2970,9 +3669,6 @@ void run_suslv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -2992,13 +3688,24 @@ void run_suslv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    for(i=0; i<plug->nparams; i++)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->sus->getpar(i) != val)
+        switch(i)
         {
-            plug->sus->changepar(i,val);
+            // Normal processing
+            case Sustain_Gain:
+            case Sustain_Sustain:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->sus->getpar(i) != val)
+                {
+                    plug->sus->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -3020,7 +3727,7 @@ LV2_Handle init_seqlv2(const LV2_Descriptor* /* descriptor */,double sample_freq
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 15;
+    plug->nparams = C_SEQUENCE_PARAMETERS;
     plug->effectindex = ISEQ;
     plug->prev_bypass = 1;
 
@@ -3040,9 +3747,6 @@ void run_seqlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -3063,41 +3767,58 @@ void run_seqlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    for(i=0; i<8; i++)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->seq->getpar(i) != val)
+        switch(i)
         {
-            plug->seq->changepar(i,val);
-        }
-    }
-    
-    val = Dry_Wet((int)*plug->param_p[i]);// 8 Dry/Wet
-    if(plug->seq->getpar(i) != val)
-    {
-        plug->seq->changepar(i,val);
-    }
-    i++;
-    
-    val = (int)*plug->param_p[i];   // 9 tempo
-    if(plug->seq->getpar(i) != val)
-    {
-        plug->seq->changepar(i,val);
-    }
-    i++;
-    
-    val = (int)*plug->param_p[i]+64;//Q or panning
-    if(plug->seq->getpar(i) != val)
-    {
-        plug->seq->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->seq->getpar(i) != val)
-        {
-            plug->seq->changepar(i,val);
+            // Normal processing
+            case Sequence_Step_1:
+            case Sequence_Step_2:
+            case Sequence_Step_3:
+            case Sequence_Step_4:
+            case Sequence_Step_5:
+            case Sequence_Step_6:
+            case Sequence_Step_7:
+            case Sequence_Step_8:
+            case Sequence_Tempo:
+            case Sequence_Amp:
+            case Sequence_Stdf:
+            case Sequence_Mode:
+            case Sequence_Range:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->seq->getpar(i) != val)
+                {
+                    plug->seq->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Sequence_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->seq->getpar(Sequence_DryWet) != val)
+                {
+                    plug->seq->changepar(Sequence_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Sequence_Resonance:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->seq->getpar(Sequence_Resonance) != val)
+                {
+                    plug->seq->changepar(Sequence_Resonance,val);
+                }
+            }
+            break;
         }
     }
 
@@ -3122,7 +3843,7 @@ LV2_Handle init_shiftlv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 10;
+    plug->nparams = C_SHIFTER_PARAMETERS;
     plug->effectindex = ISHIFT;
     plug->prev_bypass = 1;
 
@@ -3142,9 +3863,6 @@ void run_shiftlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -3165,27 +3883,53 @@ void run_shiftlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->shift->getpar(i) != val)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->shift->changepar(i,val);
-    }
-    for(i++; i<3; i++) //pan, gain
-    {
-        val = (int)*plug->param_p[i]+64;
-        if(plug->shift->getpar(i) != val)
+        switch(i)
         {
-            plug->shift->changepar(i,val);
-        }
-    }
-    for(; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->shift->getpar(i) != val)
-        {
-            plug->shift->changepar(i,val);
+            // Normal processing
+            case Shifter_Attack:
+            case Shifter_Decay:
+            case Shifter_Threshold:
+            case Shifter_Interval:
+            case Shifter_Shift:
+            case Shifter_Mode:
+            case Shifter_Whammy:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->shift->getpar(i) != val)
+                {
+                    plug->shift->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Shifter_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->shift->getpar(Shifter_DryWet) != val)
+                {
+                    plug->shift->changepar(Shifter_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Shifter_Pan:
+            case Shifter_Gain:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->shift->getpar(i) != val)
+                {
+                    plug->shift->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -3210,7 +3954,7 @@ LV2_Handle init_stomplv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 6;
+    plug->nparams = C_STOMP_PARAMETERS;
     plug->effectindex = ISTOMP;
     plug->prev_bypass = 1;
 
@@ -3225,9 +3969,6 @@ void run_stomplv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -3247,13 +3988,28 @@ void run_stomplv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    for(i=0; i<plug->nparams; i++)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->stomp->getpar(i) != val)
+        switch(i)
         {
-            plug->stomp->changepar(i,val);
+            // Normal processing
+            case Stomp_Level:
+            case Stomp_Tone:
+            case Stomp_Mid:
+            case Stomp_Bias:
+            case Stomp_Gain:
+            case Stomp_Mode:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->stomp->getpar(i) != val)
+                {
+                    plug->stomp->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -3275,7 +4031,7 @@ LV2_Handle init_revtronlv2(const LV2_Descriptor* /* descriptor */,double sample_
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 14;
+    plug->nparams = (C_REVTRON_PARAMETERS - 2);  // -2 Revtron_User_File, Revtron_Set_File
     plug->effectindex = IREVTRON;
     plug->prev_bypass = 1;
 
@@ -3289,12 +4045,8 @@ LV2_Handle init_revtronlv2(const LV2_Descriptor* /* descriptor */,double sample_
     lv2_atom_forge_init(&plug->forge, plug->urid_map);
 
     plug->revtron = new Reverbtron( /*downsample*/5, /*up interpolation method*/4, /*down interpolation method*/2 ,sample_freq, plug->period_max);
-    plug->revtron->changepar(4,1);//set to user selected files
-    
-#ifdef OLDRKRLV2
-    plug->rvbfile = new RvbFile;
-#endif // OLDRKRLV2
-    
+    plug->revtron->changepar(Revtron_User_File,1);  // set to user selected files
+
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
     plug->tmp_r = (float*)malloc(sizeof(float)*plug->period_max);
@@ -3306,12 +4058,9 @@ void run_revtronlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
-    
+
     check_shared_buf(plug,nframes);
     inline_check(plug, nframes);
 
@@ -3320,59 +4069,82 @@ void run_revtronlv2(LV2_Handle handle, uint32_t nframes)
     {
         return;
     }
- 
+
     /* adjust for possible variable nframes */
     if(plug->period_max != nframes)
     {
         plug->period_max = nframes;
         plug->revtron->lv2_update_params(nframes);
     }
-    
-    // we are good to run now
-    //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->revtron->getpar(i) != val)
-    {
-        plug->revtron->changepar(i,val);
-    }
 
-    for(i++; i<4; i++)//skip user
+    // we are good to run now
+
+    //check and set changed parameters
+    int val = 0;
+    int param_case_offset = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->revtron->getpar(i) != val)
+        switch(param_case_offset)
         {
-            plug->revtron->changepar(i,val);
+            // Normal processing
+            case Revtron_Fade:
+            case Revtron_Safe:
+            case Revtron_I_Delay:
+            case Revtron_Damp:
+            case Revtron_Stretch:
+            case Revtron_Feedback:
+            case Revtron_Ex_Stereo:
+            case Revtron_Shuffle:
+            case Revtron_LPF:
+            case Revtron_Diffusion:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->revtron->getpar(param_case_offset) != val)
+                {
+                    plug->revtron->changepar(param_case_offset,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Revtron_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->revtron->getpar(Revtron_DryWet) != val)
+                {
+                    plug->revtron->changepar(Revtron_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Revtron_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->revtron->getpar(Revtron_Pan) != val)
+                {
+                    plug->revtron->changepar(Revtron_Pan,val);
+                }
+            }
+            break;
+
+            // Skip parameter
+            case Revtron_Length:
+            case Revtron_Level:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->revtron->getpar(param_case_offset) != val)
+                {
+                    plug->revtron->changepar(param_case_offset,val);
+                }
+
+                param_case_offset++;    // skips Revtron_User_File, Revtron_Set_File
+            }
+            break;
         }
-    }
-    for(; i+1<8; i++)//skip file num
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->revtron->getpar(i+1) != val)
-        {
-            plug->revtron->changepar(i+1,val);
-        }
-    }
-    for(; i+2<11; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->revtron->getpar(i+2) != val)
-        {
-            plug->revtron->changepar(i+2,val);
-        }
-    }
-    val = (int)*plug->param_p[i]+64;//11 panning
-    if(plug->revtron->getpar(i+2) != val)
-    {
-        plug->revtron->changepar(i+2,val);
-    }
-    for(i++; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->revtron->getpar(i+2) != val)
-        {
-            plug->revtron->changepar(i+2,val);
-        }
+
+        param_case_offset++;
     }
 
     // Set up forge to write directly to notify output port.
@@ -3397,7 +4169,6 @@ void run_revtronlv2(LV2_Handle handle, uint32_t nframes)
 
         lv2_atom_forge_pop(&plug->forge, &frame);
     }
-
 
     //see if there's a file
     LV2_ATOM_SEQUENCE_FOREACH( plug->atom_in_p, ev)
@@ -3455,7 +4226,6 @@ void run_revtronlv2(LV2_Handle handle, uint32_t nframes)
 
 static LV2_Worker_Status revwork(LV2_Handle handle, LV2_Worker_Respond_Function respond, LV2_Worker_Respond_Handle rhandle, uint32_t /* size */, const void* data)
 {
-
     RKRLV2* plug = (RKRLV2*)handle;
     LV2_Atom_Object* obj = (LV2_Atom_Object*)data;
     const LV2_Atom* file_path = NULL;
@@ -3466,22 +4236,11 @@ static LV2_Worker_Status revwork(LV2_Handle handle, LV2_Worker_Respond_Function 
     {
         // Load file.
         char* path = (char*)LV2_ATOM_BODY_CONST(file_path);
-        
-#ifdef OLDRKRLV2
-        //the file is too large for a host's circular buffer
-        //so store it in the plugin for the response to use
-        //to prevent threading issues, we'll use a simple
-        //flag as a crude mutex
-        while(plug->loading_file)
-        	usleep(1000);
-        plug->loading_file = 1;
-        *plug->rvbfile = plug->revtron->loadfile(path);
-#else
+
         plug->loading_file = 1;
         strcpy(plug->revtron->Filename,path);
         plug->revtron->setfile(USERFILE);
-#endif // OLDRKRLV2
-        
+
         respond(rhandle,0,0);
     }//got file
     else
@@ -3493,11 +4252,7 @@ static LV2_Worker_Status revwork(LV2_Handle handle, LV2_Worker_Respond_Function 
 static LV2_Worker_Status revwork_response(LV2_Handle handle, uint32_t /* size */, const void* /* data */)
 {
     RKRLV2* plug = (RKRLV2*)handle;
-    
-#ifdef OLDRKRLV2
-    plug->revtron->applyfile(*plug->rvbfile);
-#endif // OLDRKRLV2
-    
+
     plug->loading_file = 0;//clear flag for next file load
     return LV2_WORKER_SUCCESS;
 }
@@ -3540,15 +4295,10 @@ static LV2_State_Status revrestore(LV2_Handle handle, LV2_State_Retrieve_Functio
     if (value)
     {
             char* path = (char*)value;
-            
-#ifdef OLDRKRLV2
-            RvbFile f = plug->revtron->loadfile(path);
-            plug->revtron->applyfile(f);
-#else   
+
             strcpy(plug->revtron->Filename,path);
             plug->revtron->setfile(USERFILE);
-#endif // OLDRKRLV2
-            
+
             plug->file_changed = 1;
     }
 
@@ -3575,7 +4325,7 @@ LV2_Handle init_echotronlv2(const LV2_Descriptor* /* descriptor */,double sample
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 14;
+    plug->nparams = (C_ECHOTRON_PARAMETERS - 2); // -2 for skip user file and set file
     plug->effectindex = IECHOTRON;
     plug->prev_bypass = 1;
 
@@ -3589,16 +4339,12 @@ LV2_Handle init_echotronlv2(const LV2_Descriptor* /* descriptor */,double sample
     lv2_atom_forge_init(&plug->forge, plug->urid_map);
 
     plug->echotron = new Echotron(sample_freq, plug->period_max);
-    plug->echotron->changepar(4,1);//set to user selected files
-    
-#ifdef OLDRKRLV2
-    plug->dlyfile = new DlyFile;
-#endif // OLDRKRLV2
-    
+    plug->echotron->changepar(Echotron_User_File,1);    // set to user selected files
+
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
     plug->tmp_r = (float*)malloc(sizeof(float)*plug->period_max);
-    
+
     return plug;
 }
 
@@ -3606,12 +4352,9 @@ void run_echotronlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
-    
+
     check_shared_buf(plug,nframes);
     inline_check(plug, nframes);
 
@@ -3620,81 +4363,98 @@ void run_echotronlv2(LV2_Handle handle, uint32_t nframes)
     {
         return;
     }
- 
+
     /* adjust for possible variable nframes */
     if(plug->period_max != nframes)
     {
         plug->period_max = nframes;
         plug->echotron->lv2_update_params(nframes);
     }
-    
+
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->echotron->getpar(i) != val)
+    int val = 0;
+    int param_case_offset = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->echotron->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i]+64;//1 fliter depth
-    if(plug->echotron->getpar(i) != val)
-    {
-        plug->echotron->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];  //2 width
-    if(plug->echotron->getpar(i) != val)
-    {
-        plug->echotron->changepar(i,val);
-    }
-    i++;
+        switch(param_case_offset)
+        {
+            // Normal processing
+            case Echotron_LFO_Width:
+            case Echotron_Tempo:
+            case Echotron_Damp:
+            case Echotron_LFO_Stereo:
+            case Echotron_Feedback:
+            case Echotron_Mod_Delay:
+            case Echotron_Mod_Filter:
+            case Echotron_LFO_Type:
+            case Echotron_Filters:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->echotron->getpar(param_case_offset) != val)
+                {
+                    plug->echotron->changepar(param_case_offset,val);
+                }
+            }
+            break;
 
-    /* 3 taps - has max of File.fLength.
-       This works even though the file length is set after the taps with presets.
-       Because on the next cycle, the file length will be adjusted after being set,
-       and then the taps get adjusted based on the correct file length. 
-     */
-    val = (int)*plug->param_p[i] > plug->echotron->File.fLength ? plug->echotron->File.fLength: (int)*plug->param_p[i];
-    if(plug->echotron->getpar(i) != val)
-    {
-        plug->echotron->changepar(i,val);
-    }
-    i++;                //skip #4 user select
-    for(; i+1<7; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->echotron->getpar(i+1) != val)
-        {
-            plug->echotron->changepar(i+1,val);
-        }
-    }
-    val = (int)*plug->param_p[i]+64;//7 l/R cross
-    if(plug->echotron->getpar(i+1) != val)
-    {
-        plug->echotron->changepar(i+1,val);
-    }
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Echotron_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->echotron->getpar(Echotron_DryWet) != val)
+                {
+                    plug->echotron->changepar(Echotron_DryWet,val);
+                }
+            }
+            break;
 
-    for(i++; i+2<11; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->echotron->getpar(i+2) != val)
-        {
-            plug->echotron->changepar(i+2,val);
+            // Offset
+            case Echotron_Depth:
+            case Echotron_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->echotron->getpar(param_case_offset) != val)
+                {
+                    plug->echotron->changepar(param_case_offset,val);
+                }
+            }
+            break;
+
+            // Adjust file length, Skip user file
+            case Echotron_Taps:
+            {
+                /* 3 taps - has max of File.fLength.
+                This works even though the file length is set after the taps with presets.
+                Because on the next cycle, the file length will be adjusted after being set,
+                and then the taps get adjusted based on the correct file length. */
+                val = (int)*plug->param_p[i] > plug->echotron->get_file_length() ? plug->echotron->get_file_length(): (int)*plug->param_p[i];
+                if(plug->echotron->getpar(Echotron_Taps) != val)
+                {
+                    plug->echotron->changepar(Echotron_Taps,val);
+                }
+
+                param_case_offset++;    // skip user file
+            }
+            break;
+
+            // Offset & skip Set file
+            case Echotron_LR_Cross:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->echotron->getpar(Echotron_LR_Cross) != val)
+                {
+                    plug->echotron->changepar(Echotron_LR_Cross,val);
+                }
+
+                param_case_offset++;    // skip set file
+            }
+            break;
         }
-    }
-    val = (int)*plug->param_p[i]+64;//11 panning
-    if(plug->echotron->getpar(i+2) != val)
-    {
-        plug->echotron->changepar(i+2,val);
-    }
-    for(i++; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->echotron->getpar(i+2) != val)
-        {
-            plug->echotron->changepar(i+2,val);
-        }
+
+        param_case_offset++;
     }
 
     // Set up forge to write directly to notify output port.
@@ -3715,11 +4475,10 @@ void run_echotronlv2(LV2_Handle handle, uint32_t nframes)
         lv2_atom_forge_key(&plug->forge, plug->URIDs.patch_property);
         lv2_atom_forge_urid(&plug->forge, plug->URIDs.filetype_dly);
         lv2_atom_forge_key(&plug->forge, plug->URIDs.patch_value);
-        lv2_atom_forge_path(&plug->forge, plug->echotron->File.Filename, strlen(plug->echotron->File.Filename)+1);
+        lv2_atom_forge_path(&plug->forge, plug->echotron->get_file_name(), strlen(plug->echotron->get_file_name())+1);
 
         lv2_atom_forge_pop(&plug->forge, &frame);
     }
-
 
     //see if there's a file
     LV2_ATOM_SEQUENCE_FOREACH( plug->atom_in_p, ev)
@@ -3752,7 +4511,7 @@ void run_echotronlv2(LV2_Handle handle, uint32_t nframes)
             	lv2_atom_forge_key(&plug->forge, plug->URIDs.patch_property);
             	lv2_atom_forge_urid(&plug->forge, plug->URIDs.filetype_dly);
             	lv2_atom_forge_key(&plug->forge, plug->URIDs.patch_value);
-            	lv2_atom_forge_path(&plug->forge, plug->echotron->File.Filename, strlen(plug->echotron->File.Filename)+1);
+            	lv2_atom_forge_path(&plug->forge, plug->echotron->get_file_name(), strlen(plug->echotron->get_file_name())+1);
 
             	lv2_atom_forge_pop(&plug->forge, &frame);
             }
@@ -3777,7 +4536,6 @@ void run_echotronlv2(LV2_Handle handle, uint32_t nframes)
 
 static LV2_Worker_Status echowork(LV2_Handle handle, LV2_Worker_Respond_Function respond, LV2_Worker_Respond_Handle rhandle, uint32_t /* size */, const void* data)
 {
-
     RKRLV2* plug = (RKRLV2*)handle;
     LV2_Atom_Object* obj = (LV2_Atom_Object*)data;
     const LV2_Atom* file_path = NULL;
@@ -3789,21 +4547,10 @@ static LV2_Worker_Status echowork(LV2_Handle handle, LV2_Worker_Respond_Function
         // Load file.
         char* path = (char*)LV2_ATOM_BODY_CONST(file_path);
 
-#ifdef OLDRKRLV2
-        //the file is too large for a host's circular buffer
-        //so store it in the plugin for the response to use
-        //to prevent threading issues, we'll use a simple
-        //flag as a crude mutex
-        while(plug->loading_file)
-        	usleep(1000);
-        plug->loading_file = 1;
-        *plug->dlyfile = plug->echotron->loadfile(path);
-#else
         plug->loading_file = 1;
         strcpy(plug->echotron->Filename,path);
         plug->echotron->setfile(USERFILE);
-#endif // OLDRKRLV2
-        
+
         respond(rhandle,0,0);
     }//got file
     else
@@ -3815,10 +4562,6 @@ static LV2_Worker_Status echowork(LV2_Handle handle, LV2_Worker_Respond_Function
 static LV2_Worker_Status echowork_response(LV2_Handle handle, uint32_t /* size */, const void* /* data */)
 {
     RKRLV2* plug = (RKRLV2*)handle;
-
-#ifdef OLDRKRLV2
-    plug->echotron->applyfile(*plug->dlyfile);
-#endif // OLDRKRLV2
 
     plug->loading_file = 0;//clear flag for next file load
     return LV2_WORKER_SUCCESS;
@@ -3838,11 +4581,11 @@ static LV2_State_Status echosave(LV2_Handle handle, LV2_State_Store_Function  st
         }
     }
 
-    char* abstractpath = map_path->abstract_path(map_path->handle, plug->echotron->File.Filename);
+    char* abstractpath = map_path->abstract_path(map_path->handle, plug->echotron->get_file_name());
 
-    store(state_handle, plug->URIDs.filetype_dly, abstractpath, strlen(plug->echotron->File.Filename) + 1,
+    store(state_handle, plug->URIDs.filetype_dly, abstractpath, strlen(plug->echotron->get_file_name()) + 1,
     		plug->URIDs.atom_Path, LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
-    
+
     free(abstractpath);
 
     return LV2_STATE_SUCCESS;
@@ -3862,15 +4605,10 @@ static LV2_State_Status echorestore(LV2_Handle handle, LV2_State_Retrieve_Functi
     if (value)
     {
         char* path = (char*)value;
-        
-#ifdef OLDRKRLV2
-        DlyFile f = plug->echotron->loadfile(path);
-        plug->echotron->applyfile(f);
-#else     
+
         strcpy(plug->echotron->Filename,path);
         plug->echotron->setfile(USERFILE);
-#endif // OLDRKRLV2
-        
+
         plug->file_changed = 1;
     }
 
@@ -3898,7 +4636,7 @@ LV2_Handle init_sharmnomidlv2(const LV2_Descriptor* /* descriptor */,double samp
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 11;
+    plug->nparams = (C_SHARM_PARAMETERS - 1);    // -1 for Sharm_MIDI
     plug->effectindex = ISHARM_NM;
     plug->prev_bypass = 1;
 
@@ -3913,8 +4651,8 @@ LV2_Handle init_sharmnomidlv2(const LV2_Descriptor* /* descriptor */,double samp
     plug->noteID->setlpf(5500); // default user option in rakarrack
     plug->noteID->sethpf(80); // default user option in rakarrack
 
-    plug->comp = new Compressor(sample_freq, plug->period_max);
-    plug->comp->setpreset(0,4); //Final Limiter
+    plug->comp = new Limiter(sample_freq, plug->period_max);
+    plug->comp->setpreset(0); //Final Limiter
     
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
@@ -3935,9 +4673,6 @@ void run_sharmnomidlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -3954,8 +4689,8 @@ void run_sharmnomidlv2(LV2_Handle handle, uint32_t nframes)
     if(plug->prev_bypass)
     {
         plug->sharm->cleanup();
-        plug->sharm->changepar(2,plug->sharm->getpar(2)); // reset interval
-        plug->sharm->changepar(5,plug->sharm->getpar(5)); // reset interval
+        plug->sharm->changepar(Sharm_L_Chroma,plug->sharm->getpar(Sharm_L_Chroma));
+        plug->sharm->changepar(Sharm_R_Chroma,plug->sharm->getpar(Sharm_R_Chroma));
         plug->chordID->cc = 1;//mark chord has changed
     }
  
@@ -3969,91 +4704,101 @@ void run_sharmnomidlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] + 64;// 1 gain l
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] + 12;// 2 interval l
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];// 3 chroma l
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] + 64;// 4 gain r
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] + 12;// 5 interval r
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];//6 set chrome 2
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];//7 select mode
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-        plug->chordID->cleanup();
-        if(!val){
-            plug->sharm->changepar(2,plug->sharm->getpar(2)); // reset interval
-            plug->sharm->changepar(5,plug->sharm->getpar(5)); // reset interval
-        }
-        
-        plug->chordID->cc = 1;//mark chord has changed
-    }
-    for(i++; i<10; i++) //8-9
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->sharm->getpar(i) != val)
-        {
-            plug->sharm->changepar(i,val);
-//            plug->chordID->ctipo = plug->sharm->getpar(9);//set chord type
-//            plug->chordID->fundi = plug->sharm->getpar(8);//set root note
-            plug->chordID->cc = 1;//mark chord has changed
-        }
-    }
-// skip midi mode, not implementing midi here
-//    val = (int)*plug->param_p[i];// 10 midi mode
-//    if(plug->aphase->getpar(i) != val)
-//    {
-//        plug->aphase->changepar(i,val);
-//        if(!val) plug->harm->changepar(3,plug->harm->getpar(3));
-//    }
-    val = (int)*plug->param_p[i];// 11 lr cr.
-    if(plug->sharm->getpar(i+1) != val)
-    {
-        plug->sharm->changepar(i+1,val);
-    }
 
-    /*
-    see Chord() in rkr.fl
-    harmonizer, need recChord and recNote.
-    see process.C ln 1507
-    */
+    //check and set changed parameters
+    int val;
+    int param_case_offset = 0;
+    for(int i = 0; i < plug->nparams; i++)
+    {
+        switch(param_case_offset)
+        {
+            // Normal processing
+            case Sharm_L_Chroma:
+            case Sharm_R_Chroma:
+            case Sharm_LR_Cross:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->sharm->getpar(param_case_offset) != val)
+                {
+                    plug->sharm->changepar(param_case_offset,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Sharm_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->sharm->getpar(Sharm_DryWet) != val)
+                {
+                    plug->sharm->changepar(Sharm_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset 64
+            case Sharm_L_Gain:
+            case Sharm_R_Gain:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset 64
+                if(plug->sharm->getpar(param_case_offset) != val)
+                {
+                    plug->sharm->changepar(param_case_offset,val);
+                }
+            }
+            break;
+
+            // Offset 12
+            case Sharm_L_Interval:
+            case Sharm_R_Interval:
+            {
+                val = (int)*plug->param_p[i] + 12;  // offset 12
+                if(plug->sharm->getpar(i) != val)
+                {
+                    plug->sharm->changepar(i,val);
+                }
+            }
+            break;
+
+            // SELECT
+            case Sharm_Select:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->sharm->getpar(Sharm_Select) != val)
+                {
+                    plug->sharm->changepar(Sharm_Select,val);
+                    plug->chordID->cleanup();
+                    if(!val){
+                        plug->sharm->changepar(Sharm_L_Chroma,plug->sharm->getpar(Sharm_L_Chroma));
+                        plug->sharm->changepar(Sharm_R_Chroma,plug->sharm->getpar(Sharm_R_Chroma));
+                    }
+
+                    plug->chordID->cc = 1;  // mark chord has changed
+                }
+            }
+            break;
+
+            // Note/Chord & skip
+            case Sharm_Note:
+            case Sharm_Chord:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->sharm->getpar(param_case_offset) != val)
+                {
+                    plug->sharm->changepar(param_case_offset,val);
+                    plug->chordID->cc = 1;  // mark chord has changed
+                }
+
+                // Skip one after Sharm_chord
+                if(param_case_offset == Sharm_Chord)
+                    param_case_offset++;    // skip Sharm_MIDI
+            }
+            break;
+        }
+
+        param_case_offset++;
+    }
 
     if(have_signal(plug->output_l_p, plug->output_r_p, nframes))
     {
@@ -4068,8 +4813,8 @@ void run_sharmnomidlv2(LV2_Handle handle, uint32_t nframes)
                     {
                         plug->chordID->Vamos(1,plug->sharm->Pintervall - 12,plug->noteID->reconota);
                         plug->chordID->Vamos(2,plug->sharm->Pintervalr - 12,plug->noteID->reconota);
-                        plug->sharm->r_ratiol = plug->chordID->r__ratio[1];//pass the found ratio
-                        plug->sharm->r_ratior = plug->chordID->r__ratio[2];//pass the found ratio
+                        plug->sharm->r_ratiol = plug->chordID->r__ratio[1]; // pass the found ratio
+                        plug->sharm->r_ratior = plug->chordID->r__ratio[2]; // pass the found ratio
                         plug->noteID->last = plug->noteID->reconota;
                     }
                 }
@@ -4082,8 +4827,8 @@ void run_sharmnomidlv2(LV2_Handle handle, uint32_t nframes)
         if (plug->chordID->cc) 
         {   
             plug->chordID->cc = 0;
-            plug->chordID->ctipo = plug->sharm->getpar(9);//set chord type
-            plug->chordID->fundi = plug->sharm->getpar(8);//set root note
+            plug->chordID->ctipo = plug->sharm->getpar(Sharm_Chord);    // set chord type
+            plug->chordID->fundi = plug->sharm->getpar(Sharm_Note);     // set root note
             plug->chordID->Vamos(1,plug->sharm->Pintervall - 12,plug->noteID->reconota);
             plug->chordID->Vamos(2,plug->sharm->Pintervalr - 12,plug->noteID->reconota);
             plug->sharm->r_ratiol = plug->chordID->r__ratio[1];
@@ -4108,7 +4853,7 @@ LV2_Handle init_mbcomplv2(const LV2_Descriptor* /* descriptor */,double sample_f
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 13;
+    plug->nparams = C_COMPBAND_PARAMETERS;
     plug->effectindex = IMBCOMP;
     plug->prev_bypass = 1;
 
@@ -4127,9 +4872,6 @@ void run_mbcomplv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -4152,19 +4894,45 @@ void run_mbcomplv2(LV2_Handle handle, uint32_t nframes)
     // we are good to run now
 
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->mbcomp->getpar(i) != val)
-    {
-        plug->mbcomp->changepar(i,val);
-    }
+    int val = 0;
 
-    for(i++; i<plug->nparams; i++)
+    for(int i; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->mbcomp->getpar(i) != val)
+        switch(i)
         {
-            plug->mbcomp->changepar(i,val);
+            // Normal processing
+            case CompBand_Low_Ratio:
+            case CompBand_Mid_1_Ratio:
+            case CompBand_Mid_2_Ratio:
+            case CompBand_High_Ratio:
+            case CompBand_Low_Thresh:
+            case CompBand_Mid_1_Thresh:
+            case CompBand_Mid_2_Thresh:
+            case CompBand_High_Thresh:
+            case CompBand_Cross_1:
+            case CompBand_Cross_2:
+            case CompBand_Cross_3:
+            case CompBand_Gain:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->mbcomp->getpar(i) != val)
+                {
+                    plug->mbcomp->changepar(i,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case CompBand_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->mbcomp->getpar(CompBand_DryWet) != val)
+                {
+                    plug->mbcomp->changepar(CompBand_DryWet,val);
+                }
+            }
+            break;
         }
     }
 
@@ -4189,7 +4957,7 @@ LV2_Handle init_otremlv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 6;
+    plug->nparams = C_OPTICAL_PARAMETERS;
     plug->effectindex = IOPTTREM;
     plug->prev_bypass = 1;
     
@@ -4204,9 +4972,6 @@ void run_otremlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -4226,25 +4991,40 @@ void run_otremlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    for(i=0; i< 5; i++)//0-4
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->otrem->getpar(i) != val)
+        switch(i)
         {
-            plug->otrem->changepar(i,val);
+            // Normal processing
+            case Optical_Depth:
+            case Optical_LFO_Tempo:
+            case Optical_LFO_Random:
+            case Optical_LFO_Type:
+            case Optical_LFO_Stereo:
+            case Optical_Invert:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->otrem->getpar(i) != val)
+                {
+                    plug->otrem->changepar(i,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Optical_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->otrem->getpar(Optical_Pan) != val)
+                {
+                    plug->otrem->changepar(Optical_Pan,val);
+                }
+            }
+            break;
         }
-    }
-    val = (int)*plug->param_p[i]+64;    //5 pan offset
-    if(plug->otrem->getpar(i) != val)
-    {
-        plug->otrem->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];//6 invert
-    if(plug->otrem->getpar(i) != val)
-    {
-        plug->otrem->changepar(i,val);
     }
 
     //now run
@@ -4265,7 +5045,7 @@ LV2_Handle init_vibelv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 11;
+    plug->nparams = C_VIBE_PARAMETERS;
     plug->effectindex = IVIBE;
     plug->prev_bypass = 1;
     
@@ -4284,9 +5064,6 @@ void run_vibelv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -4307,39 +5084,54 @@ void run_vibelv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    for(i=0; i<5; i++)//0-5
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->vibe->getpar(i) != val)
-        {
-            plug->vibe->changepar(i,val);
-        }
-    }
 
-    val = (int)*plug->param_p[i]+64; // 5 pan
-    if(plug->vibe->getpar(i) != val)
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->vibe->changepar(i,val);
-    }
-    i++;
-    val = Dry_Wet((int)*plug->param_p[i]);//6 
-    if(plug->vibe->getpar(i) != val)
-    {
-        plug->vibe->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i]+64;//7 FB
-    if(plug->vibe->getpar(i) != val)
-    {
-        plug->vibe->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++)//8-11 the rest
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->vibe->getpar(i) != val)
+        switch(i)
         {
-            plug->vibe->changepar(i,val);
+            // Normal processing
+            case Vibe_Width:
+            case Vibe_LFO_Tempo:
+            case Vibe_LFO_Random:
+            case Vibe_LFO_Type:
+            case Vibe_LFO_Stereo:
+            case Vibe_Depth:
+            case Vibe_LR_Cross:
+            case Vibe_Stereo:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->vibe->getpar(i) != val)
+                {
+                    plug->vibe->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Vibe_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->vibe->getpar(Vibe_DryWet) != val)
+                {
+                    plug->vibe->changepar(Vibe_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Vibe_Pan:
+            case Vibe_Feedback:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->vibe->getpar(i) != val)
+                {
+                    plug->vibe->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -4364,7 +5156,7 @@ LV2_Handle init_inflv2(const LV2_Descriptor* /* descriptor */,double sample_freq
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 18;
+    plug->nparams = C_INFINITY_PARAMETERS;
     plug->effectindex = IINF;
     plug->prev_bypass = 1;
 
@@ -4383,9 +5175,6 @@ void run_inflv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -4406,20 +5195,51 @@ void run_inflv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->inf->getpar(i) != val)
-    {
-        plug->inf->changepar(i,val);
-    }
 
-    for(i++; i<plug->nparams; i++)//1-17
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->inf->getpar(i) != val)
+        switch(i)
         {
-            plug->inf->changepar(i,val);
+            // Normal processing
+            case Infinity_Band_1:
+            case Infinity_Band_2:
+            case Infinity_Band_3:
+            case Infinity_Band_4:
+            case Infinity_Band_5:
+            case Infinity_Band_6:
+            case Infinity_Band_7:
+            case Infinity_Band_8:
+            case Infinity_Resonance:
+            case Infinity_Start:
+            case Infinity_End:
+            case Infinity_Tempo:
+            case Infinity_LR_Delay:
+            case Infinity_Subdivision:
+            case Infinity_AutoPan:
+            case Infinity_Reverse:
+            case Infinity_Stages:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->inf->getpar(i) != val)
+                {
+                    plug->inf->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Infinity_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->inf->getpar(Infinity_DryWet) != val)
+                {
+                    plug->inf->changepar(Infinity_DryWet,val);
+                }
+            }
+            break;
         }
     }
 
@@ -4445,7 +5265,7 @@ LV2_Handle init_phaselv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 12;
+    plug->nparams = C_PHASER_PARAMETERS;
     plug->effectindex = IPHASE;
     plug->prev_bypass = 1;
     
@@ -4471,9 +5291,6 @@ void run_phaselv2(LV2_Handle handle, uint32_t nframes)
  */
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -4494,46 +5311,55 @@ void run_phaselv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
-    //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->phase->getpar(i) != val)
-    {
-        plug->phase->changepar(i,val);
-    }
 
-    for(i++; i<1; i++) //1-4
+    //check and set changed parameters
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->phase->getpar(i) != val)
+        switch(i)
         {
-            plug->phase->changepar(i,val);
-        }
-    }
-    val = (int)*plug->param_p[i] +64;// 1 Pan offset
-    if(plug->phase->getpar(i) != val)
-    {
-        plug->phase->changepar(i,val);
-    }
-    for(i++; i<9; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->phase->getpar(i) != val)
-        {
-            plug->phase->changepar(i,val);
-        }
-    }
-    val = (int)*plug->param_p[i] +64 ;// 9 l/r cross offset
-    if(plug->phase->getpar(i) != val)
-    {
-        plug->phase->changepar(i,val);
-    }
-    for(i++; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->phase->getpar(i) != val)
-        {
-            plug->phase->changepar(i,val);
+            // Normal processing
+            case Phaser_LFO_Tempo:
+            case Phaser_LFO_Random:
+            case Phaser_LFO_Type:
+            case Phaser_LFO_Stereo:
+            case Phaser_Depth:
+            case Phaser_Feedback:
+            case Phaser_Stages:
+            case Phaser_Subtract:
+            case Phaser_Phase:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->phase->getpar(i) != val)
+                {
+                    plug->phase->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Phaser_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->phase->getpar(Phaser_DryWet) != val)
+                {
+                    plug->phase->changepar(Phaser_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Phaser_Pan:
+            case Phaser_LR_Cross:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->phase->getpar(i) != val)
+                {
+                    plug->phase->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -4558,7 +5384,7 @@ LV2_Handle init_gatelv2(const LV2_Descriptor* /* descriptor */,double sample_fre
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 7;
+    plug->nparams = C_GATE_PARAMETERS;
     plug->effectindex = IGATE;
     plug->prev_bypass = 1;
 
@@ -4573,9 +5399,6 @@ void run_gatelv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -4595,13 +5418,29 @@ void run_gatelv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    for(i=0; i<plug->nparams; i++)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->gate->getpar(i+1) != val)//this effect is 1 indexed
+        switch(i)
         {
-            plug->gate->changepar(i+1,val);
+            // Normal processing
+            case Gate_Threshold:
+            case Gate_Range:
+            case Gate_Attack:
+            case Gate_Release:
+            case Gate_LPF:
+            case Gate_HPF:
+            case Gate_Hold:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->gate->getpar(i) != val)
+                {
+                    plug->gate->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -4624,13 +5463,13 @@ LV2_Handle init_midiclv2(const LV2_Descriptor* /* descriptor */,double sample_fr
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 7;
+    plug->nparams = C_MIDICONV_PARAMETERS;
     plug->effectindex = IMIDIC;
     plug->prev_bypass = 1;
 
     getFeatures(plug,host_features);
 
-    if(!plug->scheduler || !plug->urid_map)
+    if(!plug->urid_map)
     {
     //a required feature was not supported by host
     	free(plug);
@@ -4648,9 +5487,6 @@ void run_midiclv2(LV2_Handle handle, uint32_t nframes)
 {    
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
 
@@ -4680,12 +5516,27 @@ void run_midiclv2(LV2_Handle handle, uint32_t nframes)
 
 
     //check and set changed parameters
-    for(i=0; i<plug->nparams; i++)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        val = (int)*plug->param_p[i];
-        if(plug->midic->getpar(i) != val)
+        switch(i)
         {
-            plug->midic->changepar(i,val);
+            // Normal processing
+            case MIDIConv_Gain:
+            case MIDIConv_Trigger:
+            case MIDIConv_Velocity:
+            case MIDIConv_Midi:
+            case MIDIConv_Octave:
+            case MIDIConv_FFT:
+            case MIDIConv_Panic:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->midic->getpar(i) != val)
+                {
+                    plug->midic->changepar(i,val);
+                }
+            }
+            break;
         }
     }
 
@@ -4711,7 +5562,9 @@ LV2_Handle init_convollv2(const LV2_Descriptor* /* descriptor */,double sample_f
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 7;
+    // -4 for: Convo_User_File, Convo_SKIP_5, Convo_Set_File, Convo_SKIP_9
+    plug->nparams = (C_CONVO_PARAMETERS - 4);
+
     plug->effectindex = ICONVO;
     plug->prev_bypass = 1;
 
@@ -4725,8 +5578,8 @@ LV2_Handle init_convollv2(const LV2_Descriptor* /* descriptor */,double sample_f
     lv2_atom_forge_init(&plug->forge, plug->urid_map);
 
     plug->convol = new Convolotron( /*downsample*/6, /*up interpolation method*/4, /*down interpolation method*/2 ,sample_freq, plug->period_max);
-    plug->convol->changepar(4,1);//set to user selected files
-    
+    plug->convol->changepar(Convo_User_File,1);//set to user selected files
+
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
     plug->tmp_r = (float*)malloc(sizeof(float)*plug->period_max);
@@ -4738,12 +5591,9 @@ void run_convollv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
-    
+
     check_shared_buf(plug,nframes);
     inline_check(plug, nframes);
 
@@ -4752,7 +5602,7 @@ void run_convollv2(LV2_Handle handle, uint32_t nframes)
     {
         return;
     }
- 
+
     /* adjust for possible variable nframes */
     if(plug->period_max != nframes)
     {
@@ -4761,43 +5611,66 @@ void run_convollv2(LV2_Handle handle, uint32_t nframes)
     }
 
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->convol->getpar(i) != val)
+    int val = 0;
+    int param_case_offset = 0;
+
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->convol->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] +64;// 1 pan offset
-    if(plug->convol->getpar(i) != val)
-    {
-        plug->convol->changepar(i,val);
-    }
-    
-    for(i++; i<4; i++)//skip user #4  & missing #5
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->convol->getpar(i) != val)
+        switch(param_case_offset)
         {
-            plug->convol->changepar(i,val);
+            // Normal processing
+            case Convo_Safe:
+            case Convo_Damp:
+            case Convo_Feedback:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->convol->getpar(param_case_offset) != val)
+                {
+                    plug->convol->changepar(param_case_offset,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Convo_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->convol->getpar(Convo_DryWet) != val)
+                {
+                    plug->convol->changepar(Convo_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Convo_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;   //  offset
+                if(plug->convol->getpar(Convo_Pan) != val)
+                {
+                    plug->convol->changepar(Convo_Pan,val);
+                }
+            }
+            break;
+
+            // Skip two after these
+            case Convo_Length:
+            case Convo_Level:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->convol->getpar(param_case_offset) != val)
+                {
+                    plug->convol->changepar(param_case_offset,val);
+                }
+                // increment for two skipped parameters
+                param_case_offset += 2;
+            }
+            break;
         }
-    }
-    for(; i+2<8; i++)//skip file num #8 & missing #9
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->convol->getpar(i+2) != val)
-        {
-            plug->convol->changepar(i+2,val);
-        }
-    }
-    for(; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->convol->getpar(i+4) != val)
-        {
-            plug->convol->changepar(i+4,val);
-        }
+        param_case_offset++;
     }
 
     // Set up forge to write directly to notify output port.
@@ -4822,7 +5695,6 @@ void run_convollv2(LV2_Handle handle, uint32_t nframes)
 
         lv2_atom_forge_pop(&plug->forge, &frame);
     }
-
 
     //see if there's a file
     LV2_ATOM_SEQUENCE_FOREACH( plug->atom_in_p, ev)
@@ -4861,7 +5733,7 @@ void run_convollv2(LV2_Handle handle, uint32_t nframes)
             }
         }//atom is object
     }//each atom in sequence
-    
+
     //now run
     plug->convol->out(plug->output_l_p,plug->output_r_p);
 
@@ -4880,7 +5752,6 @@ void run_convollv2(LV2_Handle handle, uint32_t nframes)
 
 static LV2_Worker_Status convwork(LV2_Handle handle, LV2_Worker_Respond_Function respond, LV2_Worker_Respond_Handle rhandle, uint32_t /* size */, const void* data)
 {
-
     RKRLV2* plug = (RKRLV2*)handle;
     LV2_Atom_Object* obj = (LV2_Atom_Object*)data;
     const LV2_Atom* file_path = NULL;
@@ -4891,16 +5762,7 @@ static LV2_Worker_Status convwork(LV2_Handle handle, LV2_Worker_Respond_Function
     {
         // Load file.
         char* path = (char*)LV2_ATOM_BODY_CONST(file_path);
-        
-#ifdef OLDRKRLV2
-        //the file is too large for a host's circular buffer
-        //so store it in the plugin for the response to use
-        //to prevent threading issues, we'll use a simple
-        //flag as a crude mutex
-        while(plug->loading_file)
-        	usleep(1000);
-#endif
-        
+
         plug->loading_file = 1;
         strcpy(plug->convol->Filename,path);
         plug->convol->setfile(USERFILE);
@@ -4956,10 +5818,10 @@ static LV2_State_Status convrestore(LV2_Handle handle, LV2_State_Retrieve_Functi
 
     if (value)
     {
-            char* path = (char*)value;
-            strcpy(plug->convol->Filename,path);
-            plug->convol->setfile(USERFILE);
-            plug->file_changed = 1;
+        char* path = (char*)value;
+        strcpy(plug->convol->Filename,path);
+        plug->convol->setfile(USERFILE);
+        plug->file_changed = 1;
     }
 
     return LV2_STATE_SUCCESS;
@@ -4985,13 +5847,13 @@ LV2_Handle init_flangerlv2(const LV2_Descriptor* /* descriptor */,double sample_
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 12;
+    plug->nparams = (C_FLANGER_PARAMETERS - 1); // -1 skip Flanger_SKIP_Flange_10
     plug->effectindex = IFLANGE;
     plug->prev_bypass = 1;
     
     getFeatures(plug,host_features);    // for period_max
     
-    plug->flanger = new Chorus(sample_freq, plug->period_max);
+    plug->flanger = new Flanger(sample_freq, plug->period_max);
     
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
@@ -5004,9 +5866,6 @@ void run_flangerlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -5027,35 +5886,71 @@ void run_flangerlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->flanger->getpar(i) != val)
+    int val = 0;
+    int param_case_offset = 0;
+    
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->flanger->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] +64;// 1 pan offset
-    if(plug->flanger->getpar(i) != val)
-    {
-        plug->flanger->changepar(i,val);
-    }
-    for(i++; i<10; i++) // 2-9
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->flanger->getpar(i) != val)
+        switch(param_case_offset)
         {
-            plug->flanger->changepar(i,val);
+            // Normal processing
+            case Flanger_LFO_Tempo:
+            case Flanger_LFO_Random:
+            case Flanger_LFO_Type:
+            case Flanger_LFO_Stereo:
+            case Flanger_Depth:
+            case Flanger_Delay:
+            case Flanger_Feedback:
+            case Flanger_Subtract:
+            case Flanger_Intense:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->flanger->getpar(param_case_offset) != val)
+                {
+                    plug->flanger->changepar(param_case_offset,val);
+                }
+            }
+            break;
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Flanger_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->flanger->getpar(Flanger_DryWet) != val)
+                {
+                    plug->flanger->changepar(Flanger_DryWet,val);
+                }
+            }
+            break;
+            
+            // Offset
+            case Flanger_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64; // offset
+                if(plug->flanger->getpar(Flanger_Pan) != val)
+                {
+                    plug->flanger->changepar(Flanger_Pan,val);
+                }
+            }
+            break;
+            
+            // Skip after this one
+            case Flanger_LR_Cross:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->flanger->getpar(Flanger_LR_Cross) != val)
+                {
+                    plug->flanger->changepar(Flanger_LR_Cross,val);
+                }
+                // increment for skipped parameter
+                param_case_offset++;
+            }
+            break;
         }
-    }
-    //skip param 10
-    for(; i<plug->nparams; i++)
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->flanger->getpar(i+1) != val)
-        {
-            plug->flanger->changepar(i+1,val);
-        }
+        param_case_offset++;
     }
 
     //now run
@@ -5079,13 +5974,13 @@ LV2_Handle init_overdrivelv2(const LV2_Descriptor* /* descriptor */,double sampl
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 11;
+    plug->nparams = (C_OVERDRIVE_PARAMETERS - 2); // -2 for Skipped param 11 and Suboctave
     plug->effectindex = IOVERDRIVE;
     plug->prev_bypass = 1;
 
     getFeatures(plug,host_features);
 
-    plug->overdrive = new Distorsion(/*oversampling*/2, /*up interpolation method*/4, /*down interpolation method*/2, sample_freq, plug->period_max);
+    plug->overdrive = new Overdrive(/*oversampling*/2, /*up interpolation method*/4, /*down interpolation method*/2, sample_freq, plug->period_max);
     
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
@@ -5098,9 +5993,6 @@ void run_overdrivelv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
 
     RKRLV2* plug = (RKRLV2*)handle;
     
@@ -5121,25 +6013,55 @@ void run_overdrivelv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // we are good to run now
+
     //check and set changed parameters
-    i=0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->overdrive->getpar(i) != val)
+    int val = 0;
+
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->overdrive->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i]+64;//1 pan
-    if(plug->overdrive->getpar(i) != val)
-    {
-        plug->overdrive->changepar(i,val);
-    }
-    for(i++; i < plug->nparams; i++) //2-10
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->overdrive->getpar(i) != val)
+        switch(i)
         {
-            plug->overdrive->changepar(i,val);
+            // Normal processing
+            case Overdrive_LR_Cross:
+            case Overdrive_Drive:
+            case Overdrive_Level:
+            case Overdrive_Type:
+            case Overdrive_Negate:
+            case Overdrive_LPF:
+            case Overdrive_HPF:
+            case Overdrive_Stereo:
+            case Overdrive_Prefilter:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->overdrive->getpar(i) != val)
+                {
+                    plug->overdrive->changepar(i,val);
+                }
+            }
+            break;
+            
+            //Special cases
+            // wet/dry -> dry/wet reversal
+            case Overdrive_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->overdrive->getpar(Overdrive_DryWet) != val)
+                {
+                    plug->overdrive->changepar(Overdrive_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset
+            case Overdrive_Pan:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->overdrive->getpar(Overdrive_Pan) != val)
+                {
+                    plug->overdrive->changepar(Overdrive_Pan,val);
+                }
+            }
+            break;
         }
     }
 
@@ -5165,7 +6087,7 @@ LV2_Handle init_harmonizerlv2(const LV2_Descriptor* /* descriptor */,double samp
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 11;
+    plug->nparams = C_HARM_PARAMETERS;
     plug->effectindex = IHARM;
     plug->prev_bypass = 1;
 
@@ -5181,8 +6103,8 @@ LV2_Handle init_harmonizerlv2(const LV2_Descriptor* /* descriptor */,double samp
     plug->noteID->setlpf(5500); // default user option in rakarrack
     plug->noteID->sethpf(80); // default user option in rakarrack
 
-    plug->comp = new Compressor(sample_freq, plug->period_max);
-    plug->comp->setpreset(0,4); //Final Limiter
+    plug->comp = new Limiter(sample_freq, plug->period_max);
+    plug->comp->setpreset(0); //Final Limiter
     
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
@@ -5204,9 +6126,7 @@ void run_harmonizerlv2(LV2_Handle handle, uint32_t nframes)
 {
     if( nframes == 0)
         return;
-    
-    int i;
-    int val;
+
     int bypass = 0;
 
     RKRLV2* plug = (RKRLV2*)handle;
@@ -5224,8 +6144,10 @@ void run_harmonizerlv2(LV2_Handle handle, uint32_t nframes)
     if(plug->prev_bypass)
     {
         plug->harm->cleanup();
-        plug->harm->changepar(3,plug->harm->getpar(3)); // update parameters after cleanup - interval
-        plug->chordID->cc = 1; //mark chord has changed to update parameters after cleanup
+        // update parameters after cleanup - interval
+        plug->harm->changepar(Harm_Interval,plug->harm->getpar(Harm_Interval));
+        //mark chord has changed to update parameters after cleanup
+        plug->chordID->cc = 1;
         bypass = 1;
     }
  
@@ -5239,7 +6161,7 @@ void run_harmonizerlv2(LV2_Handle handle, uint32_t nframes)
     }
     
     // Process incoming MIDI messages 
-    if(plug->harm->getpar(10))
+    if(plug->harm->getpar(Harm_MIDI))
     {
         // Get the capacity
         const uint32_t out_capacity = plug->atom_out_p->atom.size;
@@ -5301,69 +6223,106 @@ void run_harmonizerlv2(LV2_Handle handle, uint32_t nframes)
     }
 
     // we are good to run now
+
     //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->harm->getpar(i) != val)
+    int val = 0;
+    for(int i = 0; i < plug->nparams; i++)
     {
-        plug->harm->changepar(i,val);
-    }
-    for(i++; i<3; i++) //1-2
-    {
-        val = (int)*plug->param_p[i] + 64;
-        if(plug->harm->getpar(i) != val)
+        switch(i)
         {
-            plug->harm->changepar(i,val);
-        }
-    }
-    val = (int)*plug->param_p[i] + 12;// 3 interval
-    if(plug->harm->getpar(i) != val)
-    {
-        plug->harm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];//4 filter freq
-    if(plug->harm->getpar(i) != val)
-    {
-        plug->harm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];//5 select mode
-    if(plug->harm->getpar(i) != val)
-    {
-        plug->harm->changepar(i,val);
-        plug->chordID->cleanup();
-        if(!val) plug->harm->changepar(3,plug->harm->getpar(3)); // Reset interval
+            // Normal processing
+            case Harm_Filter_Freq:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->harm->getpar(i) != val)
+                {
+                    plug->harm->changepar(i,val);
+                }
+            }
+            break;
+            
+            
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Harm_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->harm->getpar(Harm_DryWet) != val)
+                {
+                    plug->harm->changepar(Harm_DryWet,val);
+                }
+            }
+            break;
 
-        plug->chordID->cc = 1;//mark chord has changed to update parameters after cleanup
-    }
-    for(i++; i<8; i++) //6-7
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->harm->getpar(i) != val)
-        {
-            plug->harm->changepar(i,val);
-        //    plug->chordID->ctipo = plug->harm->getpar(7);//set chord type
-        //    plug->chordID->fundi = plug->harm->getpar(6);//set root note
-            plug->chordID->cc = 1;//mark chord has changed
-        }
-    }
-    for(; i<10; i++) // 8-9
-    {
-        val = (int)*plug->param_p[i] + 64;
-        if(plug->harm->getpar(i) != val)
-        {
-            plug->harm->changepar(i,val);
-        }
-    }
 
-    // midi mode
-    val = (int)*plug->param_p[i];// 10 midi mode
-    if(plug->harm->getpar(i) != val)
-    {
-        plug->harm->changepar(i,val);
-        plug->chordID->cleanup();
-        plug->chordID->cc = 1;  //mark chord has changed to update parameters after cleanup
+            // Offset 64
+            case Harm_Pan:
+            case Harm_Gain:
+            case Harm_Filter_Gain:
+            case Harm_Filter_Q:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset
+                if(plug->harm->getpar(i) != val)
+                {
+                    plug->harm->changepar(i,val);
+                }
+            }
+            break;
+
+            // Offset 12
+            case Harm_Interval:
+            {
+                val = (int)*plug->param_p[i] + 12;  // offset
+                if(plug->harm->getpar(Harm_Interval) != val)
+                {
+                    plug->harm->changepar(Harm_Interval,val);
+                }
+            }
+            break;
+            
+            // Select Mode
+            case Harm_Select:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->harm->getpar(i) != val)
+                {
+                    plug->harm->changepar(i,val);
+                    plug->chordID->cleanup();
+                    if(!val) plug->harm->changepar(Harm_Interval,plug->harm->getpar(Harm_Interval)); // Reset 
+
+                    plug->chordID->cc = 1;  // mark chord changed to update after cleanup
+                }
+            }
+            break;
+
+            // Note and Chord
+            case Harm_Note:
+            case Harm_Chord:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->harm->getpar(i) != val)
+                {
+                    plug->harm->changepar(i,val);
+                //    plug->chordID->ctipo = plug->harm->getpar(7);//set chord type
+                //    plug->chordID->fundi = plug->harm->getpar(6);//set root note
+                    plug->chordID->cc = 1;  // mark chord has changed
+                }
+            }
+            break;
+
+            // MIDI mode
+            case Harm_MIDI:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->harm->getpar(i) != val)
+                {
+                    plug->harm->changepar(i,val);
+                    plug->chordID->cleanup();
+                    plug->chordID->cc = 1;  // mark chord changed to update after cleanup
+                }
+            }
+            break;
+        }
     }
 
 /*
@@ -5384,7 +6343,7 @@ see process.C ln 1507
                     if(plug->noteID->afreq > 0.0)
                     {
                         plug->chordID->Vamos(0,plug->harm->Pinterval - 12,plug->noteID->reconota);
-                        plug->harm->r_ratio = plug->chordID->r__ratio[0];//pass the found ratio
+                        plug->harm->r_ratio = plug->chordID->r__ratio[0];   // pass the found ratio
                         plug->noteID->last = plug->noteID->reconota;
                     }
                 }
@@ -5401,11 +6360,11 @@ see process.C ln 1507
             if(plug->harm->PSELECT || bypass)
             {
                 bypass = 0;
-                plug->chordID->ctipo = plug->harm->getpar(7);//set chord type
-                plug->chordID->fundi = plug->harm->getpar(6);//set root note
+                plug->chordID->ctipo = plug->harm->getpar(Harm_Chord);  // set chord type
+                plug->chordID->fundi = plug->harm->getpar(Harm_Note);   // set root note
             }
             plug->chordID->Vamos(0,plug->harm->Pinterval - 12,plug->noteID->reconota);
-            plug->harm->r_ratio = plug->chordID->r__ratio[0];//pass the found ratio
+            plug->harm->r_ratio = plug->chordID->r__ratio[0];           // pass the found ratio
         }
         plug->comp->out(plug->output_l_p,plug->output_r_p);
     }
@@ -5426,7 +6385,7 @@ LV2_Handle init_stereoharmlv2(const LV2_Descriptor* /* descriptor */,double samp
 {
     RKRLV2* plug = (RKRLV2*)malloc(sizeof(RKRLV2));
 
-    plug->nparams = 12;
+    plug->nparams = C_SHARM_PARAMETERS;
     plug->effectindex = ISTEREOHARM;
     plug->prev_bypass = 1;
 
@@ -5441,8 +6400,8 @@ LV2_Handle init_stereoharmlv2(const LV2_Descriptor* /* descriptor */,double samp
     plug->noteID->setlpf(5500); // default user option in rakarrack
     plug->noteID->sethpf(80); // default user option in rakarrack
 
-    plug->comp = new Compressor(sample_freq, plug->period_max);
-    plug->comp->setpreset(0,4); //Final Limiter
+    plug->comp = new Limiter(sample_freq, plug->period_max);
+    plug->comp->setpreset(0); //Final Limiter
     
     // initialize for shared in/out buffer
     plug->tmp_l = (float*)malloc(sizeof(float)*plug->period_max);
@@ -5464,8 +6423,6 @@ void run_stereoharmlv2(LV2_Handle handle, uint32_t nframes)
     if( nframes == 0)
         return;
     
-    int i;
-    int val;
     int bypass = 0;
 
     RKRLV2* plug = (RKRLV2*)handle;
@@ -5483,8 +6440,8 @@ void run_stereoharmlv2(LV2_Handle handle, uint32_t nframes)
     if(plug->prev_bypass)
     {
         plug->sharm->cleanup();
-        plug->sharm->changepar(2,plug->sharm->getpar(2)); // reset interval
-        plug->sharm->changepar(5,plug->sharm->getpar(5)); // reset interval
+        plug->sharm->changepar(Sharm_L_Chroma,plug->sharm->getpar(Sharm_L_Chroma));
+        plug->sharm->changepar(Sharm_R_Chroma,plug->sharm->getpar(Sharm_R_Chroma));
         plug->chordID->cc = 1;//mark chord has changed
         bypass = 1; // For MIDI mode upon return, need to reset default chord type and note
     }
@@ -5499,7 +6456,7 @@ void run_stereoharmlv2(LV2_Handle handle, uint32_t nframes)
     }
 
     // Process incoming MIDI messages 
-    if(plug->sharm->getpar(10))
+    if(plug->sharm->getpar(Sharm_MIDI))
     {
         // Get the capacity
         const uint32_t out_capacity = plug->atom_out_p->atom.size;
@@ -5528,7 +6485,7 @@ void run_stereoharmlv2(LV2_Handle handle, uint32_t nframes)
                                 plug->chordID->rnote[i] = cmdnote;
                                 plug->chordID->gate[i] = 1;
                                 plug->chordID->MiraChord();
-                                plug->chordID->cc = 1; // mark chord has changed
+                                plug->chordID->cc = 1; // mark chord changed
                                 break;
                             }
                         }
@@ -5545,7 +6502,7 @@ void run_stereoharmlv2(LV2_Handle handle, uint32_t nframes)
                             {
                                 plug->chordID->note_active[i] = 0;
                                 plug->chordID->gate[i] = 0;
-                                plug->chordID->cc = 1;  // mark chord has changed
+                                plug->chordID->cc = 1;  // mark chord changed
                                 break;
                             }
                         }
@@ -5561,94 +6518,113 @@ void run_stereoharmlv2(LV2_Handle handle, uint32_t nframes)
     }
 
     // we are good to run now
-    //check and set changed parameters
-    i = 0;
-    val = Dry_Wet((int)*plug->param_p[i]);
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] + 64;// 1 gain l
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] + 12;// 2 interval l
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];// 3 chroma l
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] + 64;// 4 gain r
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i] + 12;// 5 interval r
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];//6 set chrome 2
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
-    i++;
-    val = (int)*plug->param_p[i];//7 select mode
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-        plug->chordID->cleanup();
-        if(!val)
-        {
-            plug->sharm->changepar(2,plug->sharm->getpar(2)); // reset interval
-            plug->sharm->changepar(5,plug->sharm->getpar(5)); // reset interval
-        }
-        
-        plug->chordID->cc = 1;//mark chord has changed
-    }
-    for(i++; i<10; i++) //8-9
-    {
-        val = (int)*plug->param_p[i];
-        if(plug->sharm->getpar(i) != val)
-        {
-            plug->sharm->changepar(i,val);
-//            plug->chordID->ctipo = plug->sharm->getpar(9);//set chord type
-//            plug->chordID->fundi = plug->sharm->getpar(8);//set root note
-            plug->chordID->cc = 1;//mark chord has changed
-        }
-    }
-    //  midi mode
-    val = (int)*plug->param_p[i];// 10 midi mode
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-        plug->chordID->cleanup();
-        plug->chordID->cc = 1;  //mark chord has changed to update parameters after cleanup
-    }
-    i++;
-    val = (int)*plug->param_p[i];// 11 lr cr.
-    if(plug->sharm->getpar(i) != val)
-    {
-        plug->sharm->changepar(i,val);
-    }
 
-    /*
-    see Chord() in rkr.fl
-    harmonizer, need recChord and recNote.
-    see process.C ln 1507
-    */
+    //check and set changed parameters
+    int val;
+    for(int i = 0; i < plug->nparams; i++)
+    {
+        switch(i)
+        {
+            // Normal processing
+            case Sharm_L_Chroma:
+            case Sharm_R_Chroma:
+            case Sharm_LR_Cross:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->sharm->getpar(i) != val)
+                {
+                    plug->sharm->changepar(i,val);
+                }
+            }
+            break;
+
+            // Special cases
+            // wet/dry -> dry/wet reversal
+            case Sharm_DryWet:
+            {
+                val = Dry_Wet((int)*plug->param_p[i]);
+                if(plug->sharm->getpar(Sharm_DryWet) != val)
+                {
+                    plug->sharm->changepar(Sharm_DryWet,val);
+                }
+            }
+            break;
+
+            // Offset 64
+            case Sharm_L_Gain:
+            case Sharm_R_Gain:
+            {
+                val = (int)*plug->param_p[i] + 64;  // offset 64
+                if(plug->sharm->getpar(i) != val)
+                {
+                    plug->sharm->changepar(i,val);
+                }
+            }
+            break;
+
+            // Offset 12
+            case Sharm_L_Interval:
+            case Sharm_R_Interval:
+            {
+                val = (int)*plug->param_p[i] + 12;  // offset 12
+                if(plug->sharm->getpar(i) != val)
+                {
+                    plug->sharm->changepar(i,val);
+                }
+            }
+            break;
+
+            // SELECT
+            case Sharm_Select:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->sharm->getpar(Sharm_Select) != val)
+                {
+                    plug->sharm->changepar(Sharm_Select,val);
+                    plug->chordID->cleanup();
+                    if(!val)
+                    {
+                        plug->sharm->changepar(Sharm_L_Chroma,plug->sharm->getpar(Sharm_L_Chroma));
+                        plug->sharm->changepar(Sharm_R_Chroma,plug->sharm->getpar(Sharm_R_Chroma));
+                    }
+
+                    plug->chordID->cc = 1;  // mark chord changed
+                }
+            }
+            break;
+
+            // Note/Chord
+            case Sharm_Note:
+            case Sharm_Chord:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->sharm->getpar(i) != val)
+                {
+                    plug->sharm->changepar(i,val);
+                    plug->chordID->cc = 1;  // mark chord changed
+                }
+            }
+            break;
+
+            // MIDI
+            case Sharm_MIDI:
+            {
+                val = (int)*plug->param_p[i];
+                if(plug->sharm->getpar(i) != val)
+                {
+                    plug->sharm->changepar(i,val);
+                    plug->chordID->cleanup();
+                    if(!val)
+                    {
+                        plug->sharm->changepar(Sharm_L_Chroma,plug->sharm->getpar(Sharm_L_Chroma));
+                        plug->sharm->changepar(Sharm_R_Chroma,plug->sharm->getpar(Sharm_R_Chroma));
+                    }
+                    plug->chordID->cc = 1;  // mark chord changed to update after cleanup
+                }
+            }
+            break;
+        }
+    }
 
     if(have_signal(plug->output_l_p, plug->output_r_p, nframes))
     {
@@ -5663,8 +6639,8 @@ void run_stereoharmlv2(LV2_Handle handle, uint32_t nframes)
                     {
                         plug->chordID->Vamos(1,plug->sharm->Pintervall - 12,plug->noteID->reconota);
                         plug->chordID->Vamos(2,plug->sharm->Pintervalr - 12,plug->noteID->reconota);
-                        plug->sharm->r_ratiol = plug->chordID->r__ratio[1];//pass the found ratio
-                        plug->sharm->r_ratior = plug->chordID->r__ratio[2];//pass the found ratio
+                        plug->sharm->r_ratiol = plug->chordID->r__ratio[1]; // pass the found ratio
+                        plug->sharm->r_ratior = plug->chordID->r__ratio[2]; // pass the found ratio
                         plug->noteID->last = plug->noteID->reconota;
                     }
                 }
@@ -5681,8 +6657,8 @@ void run_stereoharmlv2(LV2_Handle handle, uint32_t nframes)
             if(plug->sharm->PSELECT || bypass)
             {
                 bypass = 0;
-                plug->chordID->ctipo = plug->sharm->getpar(9);//set chord type
-                plug->chordID->fundi = plug->sharm->getpar(8);//set root note
+                plug->chordID->ctipo = plug->sharm->getpar(Sharm_Chord);    // set chord type
+                plug->chordID->fundi = plug->sharm->getpar(Sharm_Note);     // set root note
             }
             plug->chordID->Vamos(1,plug->sharm->Pintervall - 12,plug->noteID->reconota);
             plug->chordID->Vamos(2,plug->sharm->Pintervalr - 12,plug->noteID->reconota);
@@ -5715,8 +6691,10 @@ void cleanup_rkrlv2(LV2_Handle handle)
     switch(plug->effectindex)
     {
     case IEQ:
+        delete plug->eq;
+        break;
     case IEQP:
-        delete plug->eq;//eql, eqp, cabinet
+        delete plug->peq;
         break;
     case ICOMP:
         delete plug->comp;
@@ -5820,15 +6798,9 @@ void cleanup_rkrlv2(LV2_Handle handle)
         break;
     case IREVTRON:
         delete plug->revtron;
-#ifdef OLDRKRLV2
-        delete plug->rvbfile;
-#endif
         break;
     case IECHOTRON:
         delete plug->echotron;
-#ifdef OLDRKRLV2
-        delete plug->dlyfile;
-#endif
         break;
     case ISHARM_NM:
     	delete plug->sharm;

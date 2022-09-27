@@ -33,6 +33,7 @@ class RKR_Scroll : public Fl_Scroll
 {
 public:
     RKR_Scroll(int X, int Y, int W, int H, const char *label=0);
+    void draw();
     void resize(int,int,int,int);
     void set_start_height(int H){m_start_height = H;};
     void set_start_width(int W){m_start_width = W;};
@@ -40,6 +41,7 @@ public:
     int get_start_y(){return m_start_y;};
     int get_start_width(){return m_start_width;};
     int get_start_height(){return m_start_height;};
+    void set_delay_scroll(){m_delay_scroll = true;};
     
 private:
 
@@ -47,6 +49,8 @@ private:
     int m_start_y;
     int m_start_width;
     int m_start_height;
+    int m_look_changed;
+    bool m_delay_scroll;
 };
 
 #endif /* RKR_SCROLL_H */

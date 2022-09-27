@@ -6,12 +6,12 @@
 #include "RKR_Light_Button.h"
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 
-class SharGui : public Fl_Group {
+class SharGui : public RKR_Gui_Effect {
 public:
   SharGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *shar_activar;
@@ -85,5 +85,7 @@ public:
 private:
   inline void cb_shar_type_i(RKR_Slider*, void*);
   static void cb_shar_type(RKR_Slider*, void*);
+public:
+  void parameter_refresh(int index);
 };
 #endif

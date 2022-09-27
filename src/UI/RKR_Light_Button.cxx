@@ -31,20 +31,24 @@ RKR_Light_Button::RKR_Light_Button(int X, int Y, int W, int H, const char *label
     m_label_offset(1),      // C_DEFAULT_FONT_SIZE + 1 = 11pt
     m_start_width(W),
     m_start_height(H),
-    m_previous_font_size(global_font_size)
+    m_look_changed(0)
 {
-    this->user_data((void*)(LIGHT_BUTTON_USER_DATA));
+    this->user_data((void*)(UD_RKR_Highlight));
 }
 
 void RKR_Light_Button::draw()
 {
-    /* To update the font size if user changes the value in settings */
-    if(global_font_size != m_previous_font_size)
+    if(m_look_changed != global_look_changed)
     {
-        m_previous_font_size = global_font_size;
+        m_look_changed = global_look_changed;
+
+        labelcolor(global_label_color);
+        color(global_fore_color);
+        labelfont(global_font_type);
+        selection_color(global_leds_color);
         font_resize(w(), h());
     }
-    
+
     if(value())
     {
         if(strcmp(label(), "Off") == 0)

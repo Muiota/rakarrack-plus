@@ -64,8 +64,8 @@ Recognize::Recognize(float trig, float tune, double sample_rate, uint32_t interm
     notes = englishNotes;
 
     Sus = new Sustainer(sample_rate, PERIOD);
-    Sus->changepar(0, 101); // This approximates the original wrong settings in rakarrack ;)
-    Sus->changepar(1, 64); // This approximates the original wrong settings in rakarrack ;)
+    Sus->changepar(Sustain_Gain, 101); // This approximates the original wrong settings in rakarrack ;)
+    Sus->changepar(Sustain_Sustain, 64); // This approximates the original wrong settings in rakarrack ;)
     //Sus->changepar(1,64);   // This is wrong - parameters are 0 & 1, not 1 & 2
     //Sus->changepar(2,127);  // This is wrong - parameters are 0 & 1, not 1 & 2
 
@@ -86,17 +86,16 @@ void
 Recognize::schmittInit(int size, double SAMPLE_RATE)
 {
     blockSize = SAMPLE_RATE / size;
-    // blocksize +2 because valgrind bitches about invalid reads in schmittS16LE()
-    schmittBuffer = (signed short int *) malloc(sizeof (signed short int) * (blockSize + 2));
+    schmittBuffer = (signed short int *) malloc(sizeof (signed short int) * (blockSize + 1));
 
-    memset(schmittBuffer, 0, sizeof (signed short int) * (blockSize + 2));
+    memset(schmittBuffer, 0, sizeof (signed short int) * (blockSize + 1));
     schmittPointer = schmittBuffer;
 }
 
 void
-Recognize::schmittS16LE(signed short int *indata)
+Recognize::schmittS16LE(const signed short int *indata)
 {
-    int j = 0;
+    int j;  // initialize ok.
 
     for (unsigned int i = 0; i < PERIOD; i++)
     {
@@ -123,10 +122,10 @@ Recognize::schmittS16LE(signed short int *indata)
             int t1 = lrintf((float) A1 * trigfact + 0.5f);
             int t2 = -lrintf((float) A2 * trigfact + 0.5f);
             
-            for (j = 1; schmittBuffer[j] <= t1 && j < blockSize; j++);
+            for (j = 1; j < blockSize && schmittBuffer[j] <= t1; j++);
             
-            for (; !(schmittBuffer[j] >= t2 &&
-                 schmittBuffer[j + 1] < t2) && j < blockSize; j++);
+            for (; j < blockSize && !(schmittBuffer[j] >= t2 &&
+                 schmittBuffer[j + 1] < t2); j++);
             
             int startpoint = j;
             int schmittTriggered = 0;
@@ -218,11 +217,10 @@ Recognize::displayFrequency(float freq)
     }
     
     float mldf = LOG_D_NOTE;
-    float ldf = 0;
 
     for (int i = 0; i < 12; i++)
     {
-        ldf = fabsf(lfreq - lfreqs[i]);
+        float ldf = fabsf(lfreq - lfreqs[i]);
         
         if (ldf < mldf)
         {

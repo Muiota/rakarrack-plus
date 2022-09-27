@@ -6,12 +6,12 @@
 #include "RKR_Light_Button.h"
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 
-class ValveGui : public Fl_Group {
+class ValveGui : public RKR_Gui_Effect {
 public:
   ValveGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *valve_activar;
@@ -89,5 +89,7 @@ public:
 private:
   inline void cb_valve_hpf_i(RKR_Slider*, void*);
   static void cb_valve_hpf(RKR_Slider*, void*);
+public:
+  void parameter_refresh(int index);
 };
 #endif

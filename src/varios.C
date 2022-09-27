@@ -30,99 +30,294 @@
 #include "process.h"
 
 int
-RKR::Message(int prio, const char *labelwin, const char *message_text)
+RKR::Message(int prio, const std::string &labelwin, const std::string &message_text)
 {
-    if ((mess_dis) && (prio == 0)) return (0);
+    if ((Config.Disable_Warnings) && (prio == 0)) return (0);
+    
+    if(Gui_Shown)
+    {
+        Fl_Widget *w = fl_message_icon();
 
-    Fl_Widget *w = fl_message_icon();
+        Fl_Image *img = new Fl_Pixmap(icono_rakarrack_32x32);
+        w->color(FL_WHITE);
+        w->label("");
+        w->image(img);
+        w->align(FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+        w->parent()->copy_label(labelwin.c_str());
 
-    Fl_Image *a = new Fl_Pixmap(icono_rakarrack_32x32_xpm);
-    w->color(FL_WHITE);
-    w->label("");
-    w->image(a);
-    w->align(FL_ALIGN_TOP | FL_ALIGN_INSIDE);
-    w->parent()->copy_label(labelwin);
-    fl_message("%s", message_text);
+        // Need to shut off below mouse or it tries to modify the fl_message widget and crash.
+        Shut_Off_Below_Mouse = 1;
+        fl_message("%s", message_text.c_str());
+        Shut_Off_Below_Mouse = 0;
+    }
+    else
+    {
+        fprintf(stderr, "%s\n", message_text.c_str());
+    }
+
     return (0);
 
 };
 
 void
-RKR::Error_Handle(int num)
+RKR::Handle_Message(int num, std::string strMessage)
 {
+    // Flag to indicate message severity.
+    // 1 = always show, even if messages are turned off in settings.
+    // 0 = only show if messages are turned on in settings.
+    int message_type = 1;
+
     char meslabel[70];
     char error_msg[256];
     memset(meslabel, 0, sizeof (meslabel));
     sprintf(meslabel, "%s %s", jackcliname, VERSION);
 
-    error_num = 0;
+    global_error_number = 0;
     memset(error_msg, 0, sizeof (error_msg));
 
     switch (num)
     {
-    case 1:
-        sprintf(error_msg, "%s", "Convolotron is unable to open the audio .wav file");
-        break;
-    case 2:
-        sprintf(error_msg, "%s", "Reverbtron is unable to open the IR .rvb file");
-        break;
-    case 3:
-        sprintf(error_msg, "%s", "Error writing the file probably you dont have permission to write in this directory");
-        break;
-    case 4:
-        sprintf(error_msg, "%s", "Echotron is unable to open the .dly file");
-        break;
-    case 5:
-        sprintf(error_msg, "%s", "Some Pan parameter is bad in the .dly file");
-        break;
-    case 6:
-        sprintf(error_msg, "%s", "Some Time parameter is bad in the .dly file");
-        break;
-    case 7:
-        sprintf(error_msg, "%s", "Some Level parameter is bad in the .dly file");
-        break;
-    case 8:
-        sprintf(error_msg, "%s", "Some LP parameter is bad in the .dly file");
-        break;
-    case 9:
-        sprintf(error_msg, "%s", "Some BP parameter is bad in the .dly file");
-        break;
-    case 10:
-        sprintf(error_msg, "%s", "Some HP parameter is bad in the .dly file");
-        break;
-    case 11:
-        sprintf(error_msg, "%s", "Some Freq parameter is bad in the .dly file");
-        break;
-    case 12:
-        sprintf(error_msg, "%s", "Some Q parameter bad in the .dly file");
-        break;
-    case 13:
-        sprintf(error_msg, "%s", "Some Stages parameter bad in the .dly file");
-        break;
+        case 1:
+            sprintf(error_msg, "%s", "Convolotron is unable to open the audio .wav file.");
+            break;
+        case 2:
+            sprintf(error_msg, "%s", "Reverbtron is unable to open the IR .rvb file");
+            break;
+        case 3:
+            sprintf(error_msg, "%s", "Error writing the file. Do you have permission to write to this directory?");
+            break;
+        case Dly_Open:
+            sprintf(error_msg, "%s", "Echotron is unable to open the .dly file");
+            break;
+        case Dly_Pan:
+            sprintf(error_msg, "%s", "Some Pan parameter is out of range in the .dly file");
+            break;
+        case Dly_Time:
+            sprintf(error_msg, "%s", "Some Time parameter is out of range in the .dly file");
+            break;
+        case Dly_Level:
+            sprintf(error_msg, "%s", "Some Level parameter is out of range in the .dly file");
+            break;
+        case Dly_LP:
+            sprintf(error_msg, "%s", "Some LP parameter is out of range in the .dly file");
+            break;
+        case Dly_BP:
+            sprintf(error_msg, "%s", "Some BP parameter is out of range in the .dly file");
+            break;
+        case Dly_HP:
+            sprintf(error_msg, "%s", "Some HP parameter is out of range in the .dly file");
+            break;
+        case Dly_Freq:
+            sprintf(error_msg, "%s", "Some Freq parameter is out of range in the .dly file");
+            break;
+        case Dly_Q:
+            sprintf(error_msg, "%s", "Some Q parameter is out of range in the .dly file");
+            break;
+        case Dly_Stages:
+            sprintf(error_msg, "%s", "Some Stages parameter is out of range in the .dly file");
+            break;
+        case 14:
+            sprintf(error_msg, "Error loading file %s", strMessage.c_str());
+            break;
+        case 15:
+            sprintf(error_msg, "Error loading file Order %s", strMessage.c_str());
+            break;
+        case 16:
+            sprintf(error_msg, "Error loading file Version %s", strMessage.c_str());
+            break;
+        case 17:
+            sprintf(error_msg, "Error loading file Author %s", strMessage.c_str());
+            break;
+        case 18:
+            sprintf(error_msg, "Error loading file Preset Name %s", strMessage.c_str());
+            break;
+        case 19:
+            sprintf(error_msg, "Error loading file General %s", strMessage.c_str());
+            break;
+        case 20:
+            sprintf(error_msg, "Error loading file MIDI %s", strMessage.c_str());
+            break;
+        case 21:
+            sprintf(error_msg, "%s", "fread error in load_names()");
+            break;
+        case 22:
+            sprintf(error_msg, "%s", "fread error in load_bank()");
+            break;
+        case 23:
+            sprintf(error_msg, "Error reading file %s", strMessage.c_str());
+            break;
+        case 24:
+            sprintf(error_msg, "%s", "Error running rakconvert!");
+            break;
+        case 25:
+            sprintf(error_msg, "%s", "Error running rakverb!");
+            break;
+        case 26:
+            sprintf(error_msg, "%s", "Error removing internal preset!");
+            break;
+        case 27:
+            sprintf(error_msg, "%s", "Error merging internal presets!");
+            break;
+        case 28:
+            sprintf(error_msg, "fread error in add_bank_item() %s", strMessage.c_str());
+            break;
+        case 29:
+            sprintf(error_msg, "%s", "Error running aconnect!");
+            break;
+        case 30:
+            sprintf(error_msg, "%s", "Can not load this Bank file because it is from an old rakarrack version,"
+                    "\n please use 'Convert Old Bank' menu entry in the Bank window.");
+            break;
+        case 31:
+            sprintf(error_msg, "%s", "Can not load this Bank file because it is from an old rakarrack git version,"
+                    "\n please use rakgit2new utility to convert.");
+            break;
+        case 32:
+            sprintf(error_msg, "%s", "!! Rakarrack-plus CPU Usage Warning !!\n"
+                    "It appears your CPU will not easily handle convolution with the current settings.\n"
+                    "Be careful with the Convolotron effect settings.\n"
+                    "Please read Help (F1) for more information.");
+            message_type = 0;
+            break;
+        case 33:
+            sprintf(error_msg, "%s", "Jack Shut Down, try to save your work");
+            break;
+        case 34:
+            sprintf(error_msg, "%s", "Cannot make a jack client, is jackd running?");
+            break;
+        case 35:
+            sprintf(error_msg,"Please, now try to load the new files");
+            break;
+        case 36:
+            sprintf(error_msg,"This file already has the new format");
+            break;
+        case 37:
+            sprintf(error_msg,"Please, now use Reverbtron to load the new '.rvb' file");
+            break;
+        case 38:
+            sprintf(error_msg, "This setting will be changed the next time you run rakarrack-plus");
+            break;
+        case 39:
+            sprintf(error_msg, "Internal Presets can not be deleted ");
+            break;
+        case 40:
+            sprintf(error_msg, "Bank file cannot be found in user directory %s\n\n"
+                    "All user banks must be put in the user directory set in:\n"
+                    "Settings/Preferences/User - User Directory", strMessage.c_str());
+            break;
+        case 41:
+            sprintf(error_msg,"User Directory is not set!\n\n"
+                    "You must set a User Directory in :\n"
+                    "Settings/Preferences/User - User Directory.");
+            break;
+        case 42:
+            sprintf(error_msg, "MIDI program file cannot be found in user directory:\n%s\n\n"
+                    "All MIDI program files should be put in the user directory set in:\n"
+                    "Settings/Preferences/User - User Directory", strMessage.c_str());
+            break;
+        case 43:
+        {
+            Convolotron *Efx_Convolotron = static_cast<Convolotron*>(Rack_Effects[EFX_CONVOLOTRON]);
+            strMessage =  Efx_Convolotron->Filename;
+            sprintf(error_msg, "Convolotron user file cannot be found in user directory:\n%s\n\n"
+                "All user files must be put in the user directory set in:\n"
+                "Settings/Preferences/User - User Directory", strMessage.c_str());
+        }
+            break;
+        case 44:
+        {
+            Echotron *Efx_Echotron = static_cast<Echotron*>(Rack_Effects[EFX_ECHOTRON]);
+            strMessage =  Efx_Echotron->Filename;
+            sprintf(error_msg, "Echotron user file cannot be found in user directory:\n%s\n\n"
+                "All user files must be put in the user directory set in:\n"
+                "Settings/Preferences/User - User Directory", strMessage.c_str());
+        }
+            break;
+        case 45:
+        {
+            Reverbtron *Efx_Reverbtron = static_cast<Reverbtron*>(Rack_Effects[EFX_REVERBTRON]);
+            strMessage =  Efx_Reverbtron->Filename;
+            sprintf(error_msg, "Reverbtron user file cannot be found in user directory:\n%s\n\n"
+                "All user files must be put in the user directory set in:\n"
+                "Settings/Preferences/User - User Directory", strMessage.c_str());
+        }
+            break;
+        case 46:
+        {
+            sprintf(error_msg, "Cannot access User Directory at:\n%s\n"
+                    "Do you have permission?\n"
+                    "Is the User Directory a valid read/write folder?", strMessage.c_str());
+        }
+            break;
+        case 47:
+        {
+            sprintf(error_msg, "Cannot access DATA Directory at:\n%s\n"
+                    "You must install Rakarrack-plus to access default preset banks.\n", strMessage.c_str());
+        }
+            break;
+        case 48:
+        {
+            int effect_number = atoi( strMessage.c_str() );
+            std::string effect_name = "";
+            
+            switch(effect_number)
+            {
+            case EFX_LOOPER:
+                effect_name = "Looper";
+                break;
+            case EFX_VOCODER:
+                effect_name = "Vocoder";
+                break;
+            }
+            
+            sprintf(error_msg, "Export of %s plugin is not supported.\n"
+                    "It will be ignored on export...\n", effect_name.c_str());
+            message_type = 0;
+        }
+            break;
+        case 49:
+        {
+            sprintf(error_msg, "Invalid number of excluded effects = %s\n"
+                    "You cannot have more than %d excluded effects\n"
+                    "to generate the random preset\n", strMessage.c_str(), C_MAX_EXCLUDED);
+        }
+            break;
+        case 50:
+        {
+            sprintf(error_msg, "Duplicate preset label: %s\n"
+                    "Please try another name for your preset.\n", strMessage.c_str());
+            message_type = 0;
+        }
+            break;
+        case 51:
+        {
+            sprintf(error_msg, "You cannot use commas in the preset name: %s\n", strMessage.c_str());
+        }
+            break;
     }
 
-    Message(1, meslabel, error_msg);
+    Message(message_type, meslabel, error_msg);
 
 }
 
-char *
-RKR::PrefNom(const char *dato)
-{
-    memset(tmpprefname, 0, sizeof (tmpprefname));
-    sprintf(tmpprefname, "%s %s", jackcliname, dato);
-    return (tmpprefname);
-}
-
+/**
+ *  Checks CPU usage
+ * 
+ * @return 
+ *  1 if /proc/cpuinfo can be opened.
+ *  0 if cannot be opened.
+ *  Currently not used.
+ */
 int
 RKR::Get_Bogomips()
 {
-    char temp[256];
     char *tmp = NULL;
     char *tmp2 = NULL;
     FILE *fp;
 
     if ((fp = fopen("/proc/cpuinfo", "r")) != NULL)
     {
+        char temp[256];
         memset(temp, 0, sizeof (temp));
 
         while (fgets(temp, sizeof temp, fp) != NULL)
@@ -139,19 +334,19 @@ RKR::Get_Bogomips()
 
         int maxx_len = lrintf(150.0f / 4800.0f * bogomips);
         
-        if (upsample)
+        if (Config.upsample)
         {
-            maxx_len /= (UpAmo + 8);
-            maxx_len /= (6 - ((UpQual + DownQual) / 2));
+            maxx_len /= (Config.UpAmo + 8);
+            maxx_len /= (6 - ((Config.UpQual + Config.DownQual) / 2));
             // printf("Max Len: %d\n",maxx_len);
 
         }
         
         if (maxx_len < 5)
         {
-            if (maxx_len < 2) maxx_len = 2;
+            // if (maxx_len < 2) maxx_len = 2;
             
-            Message(0, "!! Rakarrack CPU Usage Warning !!", "It appears your CPU will not easily handle convolution with the current settings.  Be careful with the Convolotron effect settings.\nPlease read Help (F1) for more information.");
+            Handle_Message(32);            
         }
 
         fclose(fp);
@@ -165,16 +360,16 @@ RKR::Get_Bogomips()
 int
 RKR::TapTempo()
 {
-    double latency = 0.04;
     gettimeofday(&timeA, NULL);
 
     double Aseconds = ((double) timeA.tv_sec + (double) timeA.tv_usec * 0.000001);
-    
+
     if (Tap_Selection == 0)
     {
+        double latency = 0.04;
         Aseconds += latency;
     }
-    
+
     double timediff = Aseconds - Tap_timeB;
 
     if (timediff < 3.0f)
@@ -183,7 +378,7 @@ RKR::TapTempo()
         {
             tempobuf[tempocnt] = 60.0f / ((double) timediff);
         }
-        
+
         if ((++tempocnt) >= 5)
         {
             tempocnt = 0;
@@ -191,7 +386,7 @@ RKR::TapTempo()
     }
 
     double AvTempo = 0.0;
-    
+
     for (int i = 0; i < 4; i++)
     {
         AvTempo += tempobuf[i];
@@ -206,11 +401,10 @@ RKR::TapTempo()
     {
         Tap_Display = 1;
     }
-    
-    Update_tempo();
-    
-    return (Tap_TempoSet);
 
+    Update_tempo();
+
+    return (Tap_TempoSet);
 }
 
 void
@@ -355,53 +549,38 @@ RKR::Update_tempo()
         Tap_TempoSetD = Tap_TempoSet;
     }
 
-    if (Looper_Bypass) efx_Looper->settempo(Tap_TempoSet);
-
-    if (Chorus_Bypass) efx_Chorus->changepar(2, Tap_TempoSetL);
-    if (Flanger_Bypass) efx_Flanger->changepar(2, Tap_TempoSetL);
-    if (Phaser_Bypass) efx_Phaser->changepar(2, Tap_TempoSetL);
-    if (Pan_Bypass) efx_Pan->changepar(2, Tap_TempoSetL);
-    if (WhaWha_Bypass) efx_WhaWha->changepar(2, Tap_TempoSetL);
-    if (Alienwah_Bypass) efx_Alienwah->changepar(2, Tap_TempoSetL);
-    if (MusDelay_Bypass) efx_MusDelay->changepar(10, Tap_TempoSetD);
-    if (APhaser_Bypass) efx_APhaser->changepar(2, Tap_TempoSetL);
-    if (DFlange_Bypass) efx_DFlange->changepar(10, Tap_TempoSetL);
-    if (Synthfilter_Bypass) efx_Synthfilter->changepar(2, Tap_TempoSetL);
-    if (MuTroMojo_Bypass) efx_MuTroMojo->changepar(2, Tap_TempoSetL);
-    if (VaryBand_Bypass) efx_VaryBand->changepar(1, Tap_TempoSetL);
-    if (VaryBand_Bypass) efx_VaryBand->changepar(4, Tap_TempoSetL);
-    if (Arpie_Bypass) efx_Arpie->changepar(2, Tap_TempoSetD);
-    if (Echoverse_Bypass) efx_Echoverse->changepar(2, Tap_TempoSetD);
-    if (Sequence_Bypass) efx_Sequence->changepar(9, Tap_TempoSetD);
-    if (Echotron_Bypass) efx_Echotron->changepar(5, Tap_TempoSetD);
-    if (Opticaltrem_Bypass) efx_Opticaltrem->changepar(1, Tap_TempoSetL);
-    if (Vibe_Bypass) efx_Vibe->changepar(1, Tap_TempoSetL);
-    if (Infinity_Bypass) efx_Infinity->changepar(12, Tap_TempoSetL);
-
-    if (Echo_Bypass)
+    if (EFX_Active[EFX_LOOPER])
     {
-        efx_Echo->Tempo2Delay(Tap_TempoSetD);
+        Looper *Efx_Looper = static_cast <Looper*> (Rack_Effects[EFX_LOOPER]);
+        Efx_Looper->settempo(Tap_TempoSet);
+    }
+
+    if (EFX_Active[EFX_CHORUS]) Rack_Effects[EFX_CHORUS]->changepar(Chorus_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_FLANGER]) Rack_Effects[EFX_FLANGER]->changepar(Flanger_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_PHASER]) Rack_Effects[EFX_PHASER]->changepar(Phaser_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_PAN]) Rack_Effects[EFX_PAN]->changepar(Pan_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_WAHWAH]) Rack_Effects[EFX_WAHWAH]->changepar(WahWah_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_ALIENWAH]) Rack_Effects[EFX_ALIENWAH]->changepar(Alien_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_MUSICAL_DELAY]) Rack_Effects[EFX_MUSICAL_DELAY]->changepar(Music_Tempo, Tap_TempoSetD);
+    if (EFX_Active[EFX_ANALOG_PHASER]) Rack_Effects[EFX_ANALOG_PHASER]->changepar(APhase_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_DUAL_FLANGE]) Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_SYNTHFILTER]) Rack_Effects[EFX_SYNTHFILTER]->changepar(Synthfilter_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_MUTROMOJO]) Rack_Effects[EFX_MUTROMOJO]->changepar(MuTro_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_VARYBAND]) Rack_Effects[EFX_VARYBAND]->changepar(VaryBand_LFO_Tempo_1, Tap_TempoSetL);
+    if (EFX_Active[EFX_VARYBAND]) Rack_Effects[EFX_VARYBAND]->changepar(VaryBand_LFO_Tempo_2, Tap_TempoSetL);
+    if (EFX_Active[EFX_ARPIE]) Rack_Effects[EFX_ARPIE]->changepar(Arpie_Tempo, Tap_TempoSetD);
+    if (EFX_Active[EFX_ECHOVERSE]) Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_Tempo, Tap_TempoSetD);
+    if (EFX_Active[EFX_SEQUENCE]) Rack_Effects[EFX_SEQUENCE]->changepar(Sequence_Tempo, Tap_TempoSetD);
+    if (EFX_Active[EFX_ECHOTRON]) Rack_Effects[EFX_ECHOTRON]->changepar(Echotron_Tempo, Tap_TempoSetD);
+    if (EFX_Active[EFX_OPTICALTREM]) Rack_Effects[EFX_OPTICALTREM]->changepar(Optical_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_VIBE]) Rack_Effects[EFX_VIBE]->changepar(Vibe_LFO_Tempo, Tap_TempoSetL);
+    if (EFX_Active[EFX_INFINITY]) Rack_Effects[EFX_INFINITY]->changepar(Infinity_Tempo, Tap_TempoSetL);
+
+    if (EFX_Active[EFX_ECHO])
+    {
+        Echo *Efx_Echo = static_cast<Echo*>(Rack_Effects[EFX_ECHO]);
+        Efx_Echo->Tempo2Delay(Tap_TempoSetD);
     }
 
 }
-
-/*
-void
-RKR::update_freqs(float val)
-{
-    int i;
-
-    aFreq=val;
-    freqs[0] = aFreq;
-    lfreqs[0] = logf (freqs[0]);
-    for (i = 1; i < 12; i++) {
-        freqs[i] = freqs[i - 1] * D_NOTE;
-        lfreqs[i] = lfreqs[i - 1] + LOG_D_NOTE;
-    }
-
-}
- */
-
-
-
 

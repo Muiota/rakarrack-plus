@@ -5,17 +5,17 @@
 void MidiGui::cb_midi_activar_i(RKR_Light_Button* o, void*) {
   if ((int)o->value()==0)
   { 
-    m_rkr->efx_MIDIConverter->panic();
+    m_process->efx_MIDIConverter->panic();
     Mled->color(fl_darker(FL_RED));
     Mled->redraw();
   }
 
 
-  m_rkr->MIDIConverter_Bypass=(int)o->value();
+  m_process->MIDIConverter_Active=(int)o->value();
   Midi_out_Counter->do_callback();
 
-  if(m_rgui != NULL)
-    m_rgui->ChangeActives();
+  if(m_parent != NULL)
+    m_parent->ChangeActives();
 
   MIDI_LABEL->redraw_label();
 }
@@ -27,24 +27,24 @@ void MidiGui::cb_MIDIOctave_i(RKR_Choice* o, void*) {
   switch((int)o->value())
 {
   case 0:
-  m_rkr->efx_MIDIConverter->changepar(4,-2);
+  m_process->efx_MIDIConverter->changepar(MIDIConv_Octave,-2);
   break;
   
   case 1:
-  m_rkr->efx_MIDIConverter->changepar(4,-1);
+  m_process->efx_MIDIConverter->changepar(MIDIConv_Octave,-1);
   break;
 
   case 2:
-  m_rkr->efx_MIDIConverter->changepar(4,0);
+  m_process->efx_MIDIConverter->changepar(MIDIConv_Octave,0);
   break;
 
   case 3:
-  m_rkr->efx_MIDIConverter->changepar(4,1);
+  m_process->efx_MIDIConverter->changepar(MIDIConv_Octave,1);
 
   break;
 
   case 4:
-  m_rkr->efx_MIDIConverter->changepar(4,2);
+  m_process->efx_MIDIConverter->changepar(MIDIConv_Octave,2);
   break;
 
 };
@@ -63,28 +63,28 @@ Fl_Menu_Item MidiGui::menu_MIDIOctave[] = {
 };
 
 void MidiGui::cb_Midi_out_Counter_i(RKR_Counter* o, void*) {
-  m_rkr->efx_MIDIConverter->changepar(3, (int)o->value());
+  m_process->efx_MIDIConverter->changepar(MIDIConv_Midi, (int)o->value());
 }
 void MidiGui::cb_Midi_out_Counter(RKR_Counter* o, void* v) {
   ((MidiGui*)(o->parent()))->cb_Midi_out_Counter_i(o,v);
 }
 
 void MidiGui::cb_Use_FFT_i(RKR_Check_Button* o, void*) {
-  m_rkr->efx_MIDIConverter->changepar(5, (int)o->value());
+  m_process->efx_MIDIConverter->changepar(MIDIConv_FFT, (int)o->value());
 }
 void MidiGui::cb_Use_FFT(RKR_Check_Button* o, void* v) {
   ((MidiGui*)(o->parent()))->cb_Use_FFT_i(o,v);
 }
 
 void MidiGui::cb_Trig_Adj_i(RKR_Slider* o, void*) {
-  m_rkr->efx_MIDIConverter->changepar(1,(int)o->value());
+  m_process->efx_MIDIConverter->changepar(MIDIConv_Trigger,(int)o->value());
 }
 void MidiGui::cb_Trig_Adj(RKR_Slider* o, void* v) {
   ((MidiGui*)(o->parent()))->cb_Trig_Adj_i(o,v);
 }
 
 void MidiGui::cb_Vel_Adj_i(RKR_Slider* o, void*) {
-  m_rkr->efx_MIDIConverter->changepar(2,(int)o->value());
+  m_process->efx_MIDIConverter->changepar(MIDIConv_Velocity,(int)o->value());
 }
 void MidiGui::cb_Vel_Adj(RKR_Slider* o, void* v) {
   ((MidiGui*)(o->parent()))->cb_Vel_Adj_i(o,v);
@@ -94,7 +94,6 @@ MidiGui::MidiGui(int X, int Y, int W, int H, const char *L)
 this->box(FL_UP_BOX);
 this->color(FL_FOREGROUND_COLOR);
 this->selection_color(FL_FOREGROUND_COLOR);
-this->user_data((void*)(1));
 this->align(Fl_Align(96|FL_ALIGN_INSIDE));
 { midi_activar = new RKR_Light_Button(5, 4, 38, 18, "On");
   midi_activar->tooltip("Enable MIDI Converter - Shortcut \'M\'");
@@ -106,7 +105,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   midi_activar->labelfont(0);
   midi_activar->labelsize(10);
   midi_activar->labelcolor(FL_FOREGROUND_COLOR);
-  midi_activar->callback((Fl_Callback*)cb_midi_activar, (void*)(2));
+  midi_activar->callback((Fl_Callback*)cb_midi_activar);
   midi_activar->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   midi_activar->when(FL_WHEN_CHANGED);
 } // RKR_Light_Button* midi_activar
@@ -122,7 +121,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   MIDIOctave->labelcolor(FL_BACKGROUND2_COLOR);
   MIDIOctave->textsize(10);
   MIDIOctave->textcolor(FL_BACKGROUND2_COLOR);
-  MIDIOctave->callback((Fl_Callback*)cb_MIDIOctave, (void*)(12));
+  MIDIOctave->callback((Fl_Callback*)cb_MIDIOctave);
   MIDIOctave->align(Fl_Align(FL_ALIGN_LEFT));
   MIDIOctave->when(FL_WHEN_CHANGED);
   MIDIOctave->menu(menu_MIDIOctave);
@@ -161,7 +160,7 @@ results.");
   Use_FFT->labelfont(0);
   Use_FFT->labelsize(10);
   Use_FFT->labelcolor(FL_BACKGROUND2_COLOR);
-  Use_FFT->callback((Fl_Callback*)cb_Use_FFT, (void*)(2));
+  Use_FFT->callback((Fl_Callback*)cb_Use_FFT);
   Use_FFT->align(Fl_Align(FL_ALIGN_TOP));
   Use_FFT->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* Use_FFT
@@ -216,16 +215,15 @@ results.");
   MIDI_LABEL->labelfont(1);
   MIDI_LABEL->labelsize(14);
   MIDI_LABEL->labelcolor(FL_BACKGROUND2_COLOR);
-  MIDI_LABEL->user_data((void*)(7));
   MIDI_LABEL->align(Fl_Align(FL_ALIGN_CENTER));
   MIDI_LABEL->when(FL_WHEN_NEVER);
 } // RKR_Box* MIDI_LABEL
-this->m_rgui = NULL; this->m_rkr = NULL;
+this->m_parent = NULL; this->m_process = NULL;
 position(X, Y);
 end();
 }
 
 void MidiGui::initialize(RKR* _rkr, RKRGUI* _rgui) {
-  m_rkr = _rkr;
-  m_rgui= _rgui;
+  m_process = _rkr;
+  m_parent= _rgui;
 }

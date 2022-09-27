@@ -10,3 +10,6 @@ target_include_directories (rakverb2 PRIVATE  ${SNDFILE_INCLUDE_DIRS})
 target_link_libraries(rakverb2 PRIVATE ${SNDFILE_LIBRARIES} )
 
 install (TARGETS rakconvert rakverb rakverb2 rakgit2new RUNTIME DESTINATION bin)
+
+install (FILES InsertPresets.rkis
+    DESTINATION share/rakarrack-plus)

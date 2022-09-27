@@ -257,8 +257,8 @@ def remap(efxindex, paramindex):
          (11, 11) : (-1,) ,
 
          (12, -1) : ('RakarrackPlus Cabinet', 'https://github.com/Stazed/rakarrack-plus#cabe') ,
-         (12, 0) : (1, 'Preset', 'PRESET', 0) ,
-         (12, 1) : (2, 'Gain', 'GAIN', -64) ,
+         (12, 0) : (2, 'Preset', 'PRESET', 0) ,
+         (12, 1) : (1, 'Gain', 'GAIN', -64) ,
          (12, 2) : (-1,) ,
 
          (13, -1) : ('RakarrackPlus Pan', 'https://github.com/Stazed/rakarrack-plus#pan') ,
@@ -305,7 +305,7 @@ def remap(efxindex, paramindex):
 
          (16, -1) : ('RakarrackPlus NoiseGate', 'https://github.com/Stazed/rakarrack-plus#gate') ,
          (16, 0) : (1, 'Threshold', 'THRESHOLD', 0) ,
-         (16, 1) : (2, 'Rang', 'RANGE', 0) ,
+         (16, 1) : (2, 'Range', 'RANGE', 0) ,
          (16, 2) : (3, 'Attack Time', 'ATTACK', 0) ,
          (16, 3) : (4, 'Release Time', 'RELEASE', 0) ,
          (16, 4) : (5, 'Lowpass Filter', 'LPF', 0) ,
@@ -585,8 +585,8 @@ def remap(efxindex, paramindex):
          (35, 1) : (2, 'Pan', 'PAN', -64) ,
          (35, 2) : (3, 'Smear', 'MUF', 0) ,
          (35, 3) : (4, 'Q', 'Q', 0) ,
-         (35, 4) : (5, 'Level', 'LEVEL', 0) ,
-         (35, 5) : (6, 'Input Gain', 'INGAIN', 0) ,
+         (35, 4) : (5, 'Input Gain', 'INGAIN', 0) ,
+         (35, 5) : (6, 'Level', 'LEVEL', 0) ,
          (35, 6) : (7, 'Ring Mod. Depth', 'RING', 0) ,
          (35, 7) : (8, 'Auxiliary Input', 'AUX_INPUT', 0) ,
          (35, 8) : (9, 'Auxiliary Input Level', 'INPUT', 0) ,

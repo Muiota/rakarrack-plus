@@ -7,13 +7,13 @@
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
 #include "RKR_Counter.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 #include "common_gui_menu.h"
 
-class AphaserGui : public Fl_Group {
+class AphaserGui : public RKR_Gui_Effect {
 public:
   AphaserGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *aphaser_activar;
@@ -57,10 +57,10 @@ private:
   inline void cb_aphaser_width_i(RKR_Slider*, void*);
   static void cb_aphaser_width(RKR_Slider*, void*);
 public:
-  RKR_Slider *aphaser_phase;
+  RKR_Slider *aphaser_depth;
 private:
-  inline void cb_aphaser_phase_i(RKR_Slider*, void*);
-  static void cb_aphaser_phase(RKR_Slider*, void*);
+  inline void cb_aphaser_depth_i(RKR_Slider*, void*);
+  static void cb_aphaser_depth(RKR_Slider*, void*);
 public:
   RKR_Slider *aphaser_fb;
 private:
@@ -92,5 +92,8 @@ private:
   inline void cb_aphaser_hyper_i(RKR_Check_Button*, void*);
   static void cb_aphaser_hyper(RKR_Check_Button*, void*);
   CommonGuiMenu *m_lfo_menu; 
+public:
+  void parameter_refresh(int index);
+  void tap_tempo_update();
 };
 #endif

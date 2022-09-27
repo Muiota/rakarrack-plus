@@ -6,12 +6,12 @@
 #include "RKR_Light_Button.h"
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 
-class HarGui : public Fl_Group {
+class HarGui : public RKR_Gui_Effect {
 public:
   HarGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *har_activar;
@@ -80,5 +80,7 @@ public:
 private:
   inline void cb_har_type_i(RKR_Slider*, void*);
   static void cb_har_type(RKR_Slider*, void*);
+public:
+  void parameter_refresh(int index);
 };
 #endif

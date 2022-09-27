@@ -1,5 +1,5 @@
 # data file for the Fltk User Interface Designer (fluid)
-version 1.0305
+version 1.0304
 header_name {.h}
 code_name {.cxx}
 decl {\#include "RKR_Light_Button.h"} {public global
@@ -8,40 +8,43 @@ decl {\#include "RKR_Light_Button.h"} {public global
 decl {\#include "RKR_Choice.h"} {public global
 }
 
-widget_class ExpanderGui {
-  user_data 1 open
+decl {\#include "RKR_GUI_Effect.h"} {public global
+}
+
+widget_class ExpanderGui {open selected
   xywh {1550 57 155 180} type Double box UP_BOX color 0 selection_color 0 align 112
   code0 {\#include "RKR_Slider.h"}
   code1 {\#include "../process.h"}
-  code2 {\#include "rakarrack.h"} visible position_relative
+  code2 {\#include "rakarrack.h"}
+  class RKR_Gui_Effect visible position_relative
 } {
   Fl_Light_Button expander_activar {
     label On
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Expander_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_EXPANDER]);
  return;
 }
-rkr->Expander_Bypass=(int)o->value();
-rgui->findpos(25,(int)o->value(),o);}
+m_process->EFX_Active[EFX_EXPANDER]=(int)o->value();
+m_parent->findpos(EFX_EXPANDER,(int)o->value(),o);}
     xywh {5 4 34 18} shortcut 0x32 color 62 selection_color 1 labelsize 10 align 84 when 1
+    code0 {activate_effect = o;}
     class RKR_Light_Button
   }
   Fl_Choice expander_preset {
     label Preset
-    user_data 12025
+    user_data UD_PRESET_EXPANDER
     callback {long long ud= (long long) v;
-if((ud==0)||(ud==12025))rkr->efx_Expander->setpreset((int) o->value());
-expander_ATime->value(rkr->efx_Expander->getpar(3));
-expander_RTime->value(rkr->efx_Expander->getpar(4));
-expander_shape->value(rkr->efx_Expander->getpar(2));
-expander_threshold->value(rkr->efx_Expander->getpar(1));
-expander_HPF->value(rkr->efx_Expander->getpar(6));
-expander_LPF->value(rkr->efx_Expander->getpar(5));
-expander_level->value(rkr->efx_Expander->getpar(7));} selected
+if((ud==0)||(ud==UD_PRESET_EXPANDER))
+    m_process->Rack_Effects[EFX_EXPANDER]->setpreset((int) o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_EXPANDER]; i++)
+{
+    parameter_refresh(i);
+};}
     xywh {77 4 76 18} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
+    code0 {preset_choice = o;}
     class RKR_Choice
   } {
     MenuItem {} {
@@ -63,79 +66,106 @@ expander_level->value(rkr->efx_Expander->getpar(7));} selected
   }
   Fl_Value_Slider expander_ATime {
     label {A. Time}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(220);
+ m_parent->getMIDIControl(MC_Expander_Attack);
  return;
 } 
-rkr->efx_Expander->changepar(3,(int)o->value());}
+m_process->Rack_Effects[EFX_EXPANDER]->changepar(Expander_Attack,(int)o->value());}
     xywh {56 39 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 1 maximum 5000 step 1 value 10 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider expander_RTime {
     label {R. Time}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(221);
+ m_parent->getMIDIControl(MC_Expander_Release);
  return;
 } 
-rkr->efx_Expander->changepar(4,(int) o->value());}
+m_process->Rack_Effects[EFX_EXPANDER]->changepar(Expander_Release,(int) o->value());}
     xywh {56 61 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 10 maximum 1000 step 1 value 500 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider expander_shape {
     label Shape
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(222);
+ m_parent->getMIDIControl(MC_Expander_Shape);
  return;
 } 
-rkr->efx_Expander->changepar(2, (int) o->value());}
+m_process->Rack_Effects[EFX_EXPANDER]->changepar(Expander_Shape, (int) o->value());}
     xywh {56 83 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 1 maximum 50 step 1 value 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider expander_threshold {
     label Threshold
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(223);
+ m_parent->getMIDIControl(MC_Expander_Threshold);
  return;
 } 
-rkr->efx_Expander->changepar(1, (int)o->value());}
+m_process->Rack_Effects[EFX_EXPANDER]->changepar(Expander_Threshold, (int)o->value());}
     xywh {56 105 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -80 maximum 0 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider expander_level {
     label {Out Gain}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(224);
+ m_parent->getMIDIControl(MC_Expander_Gain);
  return;
 } 
-rkr->efx_Expander->changepar(7, (int) o->value());}
+m_process->Rack_Effects[EFX_EXPANDER]->changepar(Expander_Gain, (int) o->value());}
     xywh {56 125 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 1 maximum 127 step 1 value 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider expander_LPF {
     label LPF
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(225);
+ m_parent->getMIDIControl(MC_Expander_LPF);
  return;
 } 
-rkr->efx_Expander->changepar(5, (int)o->value());}
+m_process->Rack_Effects[EFX_EXPANDER]->changepar(Expander_LPF, (int)o->value());}
     xywh {56 146 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 20 maximum 26000 step 1 value 20000 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider expander_HPF {
     label HPF
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(226);
+ m_parent->getMIDIControl(MC_Expander_HPF);
  return;
 } 
-rkr->efx_Expander->changepar(6, (int)o->value());}
+m_process->Rack_Effects[EFX_EXPANDER]->changepar(Expander_HPF, (int)o->value());}
     xywh {56 162 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 20 maximum 20000 step 1 value 20 textcolor 7
     class RKR_Slider
+  }
+  Function {parameter_refresh(int index)} {return_type void
+  } {
+    code {switch (index)
+    {
+    case Expander_Threshold:
+        expander_threshold->value(m_process->Rack_Effects[EFX_EXPANDER]->getpar(Expander_Threshold));
+        break;
+    case Expander_Shape:
+        expander_shape->value(m_process->Rack_Effects[EFX_EXPANDER]->getpar(Expander_Shape));
+        break;
+    case Expander_Attack:
+        expander_ATime->value(m_process->Rack_Effects[EFX_EXPANDER]->getpar(Expander_Attack));
+        break;
+    case Expander_Release:
+        expander_RTime->value(m_process->Rack_Effects[EFX_EXPANDER]->getpar(Expander_Release));
+        break;
+    case Expander_LPF:
+        expander_LPF->value(m_process->Rack_Effects[EFX_EXPANDER]->getpar(Expander_LPF));
+        break;
+    case Expander_HPF:
+        expander_HPF->value(m_process->Rack_Effects[EFX_EXPANDER]->getpar(Expander_HPF));
+        break;
+    case Expander_Gain:
+        expander_level->value(m_process->Rack_Effects[EFX_EXPANDER]->getpar(Expander_Gain));
+        break;
+    }} {}
   }
 }

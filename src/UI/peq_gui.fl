@@ -1,5 +1,5 @@
 # data file for the Fltk User Interface Designer (fluid)
-version 1.0305
+version 1.0304
 header_name {.h}
 code_name {.cxx}
 decl {\#include "RKR_Light_Button.h"} {public global
@@ -8,45 +8,45 @@ decl {\#include "RKR_Light_Button.h"} {public global
 decl {\#include "RKR_Choice.h"} {public global
 }
 
-widget_class PeqGui {
-  user_data 1 open
+decl {\#include "RKR_GUI_Effect.h"} {public global
+}
+
+widget_class PeqGui {open selected
   xywh {1514 80 155 180} type Double box UP_BOX color 0 selection_color 0 align 112
   code0 {\#include "RKR_Slider.h"}
   code1 {\#include "../process.h"}
-  code2 {\#include "rakarrack.h"} visible position_relative
+  code2 {\#include "rakarrack.h"}
+  class RKR_Gui_Effect visible position_relative
 } {
   Fl_Light_Button eqp_activar {
     label On
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->EQ2_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_PARAMETRIC]);
  return;
 }
-rkr->EQ2_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_PARAMETRIC]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_EQ2->cleanup();
-rgui->findpos(9,(int)o->value(),o);}
+m_process->Rack_Effects[EFX_PARAMETRIC]->cleanup();
+m_parent->findpos(EFX_PARAMETRIC,(int)o->value(),o);}
     xywh {5 4 34 18} shortcut 0x30 color 62 selection_color 1 labelsize 10 when 1
+    code0 {activate_effect = o;}
     class RKR_Light_Button
   }
   Fl_Choice eqp_preset {
     label Preset
-    user_data 12009
+    user_data UD_PRESET_PARAMETRIC
     callback {long long ud= (long long) v;
-if((ud==0)||(ud==12009)) rkr->EQ2_setpreset((int)o->value());
-eqp_LF->value(rkr->efx_EQ2->getpar(11));
-eqp_LFg->value(rkr->efx_EQ2->getpar(12)-64);
-eqp_LQ->value(rkr->efx_EQ2->getpar(13)-64);
-eqp_MF->value(rkr->efx_EQ2->getpar(16));
-eqp_MFg->value(rkr->efx_EQ2->getpar(17)-64);
-eqp_MQ->value(rkr->efx_EQ2->getpar(18)-64);
-eqp_HF->value(rkr->efx_EQ2->getpar(21));
-eqp_HFg->value(rkr->efx_EQ2->getpar(22)-64);
-eqp_HQ->value(rkr->efx_EQ2->getpar(23)-64);
-eqp_Gain->value(rkr->efx_EQ2->getpar(0)-64);} selected
+if((ud==0)||(ud==UD_PRESET_PARAMETRIC))
+    m_process->Rack_Effects[EFX_PARAMETRIC]->setpreset((int)o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_PARAMETRIC]; i++)
+{
+    parameter_refresh(i);
+};}
     xywh {77 4 76 18} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
+    code0 {preset_choice = o;}
     class RKR_Choice
   } {
     MenuItem {} {
@@ -64,112 +64,148 @@ eqp_Gain->value(rkr->efx_EQ2->getpar(0)-64);} selected
   }
   Fl_Value_Slider eqp_Gain {
     label Gain
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(148);
+ m_parent->getMIDIControl(MC_Parametric_Gain);
  return;
 } 
-rkr->efx_EQ2->changepar(0,(int)(o->value()+64));}
-    xywh {53 26 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_Gain,(int)(o->value()+64));}
+    xywh {56 26 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider eqp_LF {
     label {Low F.}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(149);
+ m_parent->getMIDIControl(MC_Parametric_Low_Freq);
  return;
 } 
-rkr->efx_EQ2->changepar(11,(int)o->value());}
-    tooltip {Low Frequency} xywh {53 50 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 20 maximum 1000 step 1 value 200 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_Low_Freq,(int)o->value());}
+    tooltip {Low Frequency} xywh {56 50 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 20 maximum 1000 step 1 value 200 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider eqp_LFg {
     label {Low G.}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(150);
+ m_parent->getMIDIControl(MC_Parametric_Low_Gain);
  return;
 } 
-rkr->efx_EQ2->changepar(12,(int)(o->value()+64));}
-    tooltip {Low Gain} xywh {53 63 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_Low_Gain,(int)(o->value()+64));}
+    tooltip {Low Gain} xywh {56 63 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider eqp_LQ {
     label {Low Q.}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(151);
+ m_parent->getMIDIControl(MC_Parametric_Low_Q);
  return;
 } 
-rkr->efx_EQ2->changepar(13,(int)(o->value()+64));}
-    tooltip {Low Width} xywh {53 76 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_Low_Q,(int)(o->value()+64));}
+    tooltip {Low Width} xywh {56 76 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider eqp_MF {
     label {Mid F.}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(152);
+ m_parent->getMIDIControl(MC_Parametric_Mid_Freq);
  return;
 } 
-rkr->efx_EQ2->changepar(5+11,(int)o->value());}
-    tooltip {Mid Frequency} xywh {53 98 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 800 maximum 8000 step 1 value 800 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_Mid_Freq,(int)o->value());}
+    tooltip {Mid Frequency} xywh {56 98 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 800 maximum 8000 step 1 value 800 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider eqp_MFg {
     label {Mid G.}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(153);
+ m_parent->getMIDIControl(MC_Parametric_Mid_Gain);
  return;
 } 
-rkr->efx_EQ2->changepar(5+12,(int)(o->value()+64));}
-    tooltip {Mid Gain} xywh {53 110 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_Mid_Gain,(int)(o->value()+64));}
+    tooltip {Mid Gain} xywh {56 110 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider eqp_MQ {
     label {Mid Q.}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(154);
+ m_parent->getMIDIControl(MC_Parametric_Mid_Q);
  return;
 } 
-rkr->efx_EQ2->changepar(5+13,(int)(o->value()+64));}
-    tooltip {Mid Width} xywh {53 122 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_Mid_Q,(int)(o->value()+64));}
+    tooltip {Mid Width} xywh {56 122 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider eqp_HF {
     label {High F.}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(155);
+ m_parent->getMIDIControl(MC_Parametric_High_Freq);
  return;
 } 
-rkr->efx_EQ2->changepar(10+11,(int)o->value());}
-    tooltip {High Frequency} xywh {53 144 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 6000 maximum 26000 step 1 value 12000 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_High_Freq,(int)o->value());}
+    tooltip {High Frequency} xywh {56 144 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum 6000 maximum 26000 step 1 value 12000 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider eqp_HFg {
     label {High G.}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(156);
+ m_parent->getMIDIControl(MC_Parametric_High_Gain);
  return;
 } 
-rkr->efx_EQ2->changepar(10+12,(int)(o->value()+64));}
-    tooltip {High Gain} xywh {53 156 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_High_Gain,(int)(o->value()+64));}
+    tooltip {High Gain} xywh {56 156 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider eqp_HQ {
     label {High Q.}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(157);
+ m_parent->getMIDIControl(MC_Parametric_High_Q);
  return;
 } 
-rkr->efx_EQ2->changepar(10+13,(int)(o->value()+64));}
-    tooltip {High Width} xywh {53 168 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
+m_process->Rack_Effects[EFX_PARAMETRIC]->changepar(Parametric_High_Q,(int)(o->value()+64));}
+    tooltip {High Width} xywh {56 168 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
     class RKR_Slider
+  }
+  Function {parameter_refresh(int index)} {return_type void
+  } {
+    code {switch(index)
+    {
+    case Parametric_Low_Freq:
+        eqp_LF->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_Low_Freq));
+        break;
+    case Parametric_Low_Gain:
+        eqp_LFg->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_Low_Gain)-64);
+        break;
+    case Parametric_Low_Q:
+        eqp_LQ->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_Low_Q)-64);
+        break;
+    case Parametric_Mid_Freq:
+        eqp_MF->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_Mid_Freq));
+        break;
+    case Parametric_Mid_Gain:
+        eqp_MFg->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_Mid_Gain)-64);
+        break;
+    case Parametric_Mid_Q:
+        eqp_MQ->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_Mid_Q)-64);
+        break;
+    case Parametric_High_Freq:
+        eqp_HF->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_High_Freq));
+        break;
+    case Parametric_High_Gain:
+        eqp_HFg->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_High_Gain)-64);
+        break;
+    case Parametric_High_Q:
+        eqp_HQ->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_High_Q)-64);
+        break;
+    case Parametric_Gain:
+        eqp_Gain->value(m_process->Rack_Effects[EFX_PARAMETRIC]->getpar(Parametric_Gain)-64);
+        break;
+    }} {}
   }
 }

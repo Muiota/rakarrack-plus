@@ -310,10 +310,13 @@ screenshot shows the connection of a guitar, usually mono aural.</p>
 <h3><a name="pyb"></a>Presets &amp; Banks</h3>
 
 <p>The state of the rack can be saved to a file at any
-time, either pressing the "Save" buttons or via the menu
-File-&gt;Save Preset. Rakarrack-plus suggests the preset name for the
-filename.rkr in the save operation, but you can put what you want.
-You can assign the preset name here:</p>
+time, either pressing the "Export" button or via the menu
+File-&gt;Export Preset. The export file is a text file that can
+be shared and imported from other users. Rakarrack-plus default extension
+is .rkr, but this is not required. These single preset text files do
+not have to be kept in the User directory to be used.</p>
+
+<p>Set the preset name here:</p>
 
 <p><img src="imagenes/preset_name1.png" alt="rakarrack Preset Box"></p>
 
@@ -382,21 +385,40 @@ installation included banks are installed with root privileges and cannot be ove
 They are installed in the data directory selected during the configure process,
 normally in "/usr/share/rakarrack-plus" or "/usr/local/share/rakarrack-plus".
 These banks, Default.rkrb, Extra.rkrb and Extra1.rkrb should be copied to another
-location if you wish to modify them.
+file and placed in the user directory location if you wish to modify them.
 The banks contain default presets developed by <a href="#autores">the
 development team and some friends</a> who have contributed in this
 facet.</p>
 
 <p> The "1", "2", "3", "U" buttons are for fast bank loading. These buttons
 load the Default.rkrb, Extra.rkrb, Extra1.rkrb and the user setting defined bank
-set in <a href="#bprefs">Bank preferences</a>.</p>
+set in <a href="#bprefs">User preferences</a>.</p>
+<p>In addition three addition special effects banks are also included and can
+    be selected from the bank window "User Banks" choice menu.</p>
 
-<p> The "Random" button generates a random preset</p>
+<p><b>Random</b></p>
+<p>The "Random" button generates a random preset. Right mouse button
+on the random button will show a configure window. You can adjust how the random button
+will generate a preset. By default the random button will select from all rack effects
+and randomly choose an individual effect preset. Also the number of active effects will
+be randomly determined to a maximum of six. These settings can be changed from the 
+random configure window. You can choose to have all parameters of the rack effect
+to be set randomly, and exclude any effect from the selection process. In addition,
+the number of chosen effects can be set, as well as whether they all should be active
+or randomly set as active.</p>
+<p>You can also set the parameters to any individual rack effect randomly by right
+    mouse button on the effect name from the main window rack.</p>
+<p><b>CAUTION!!!</b></p>
+<p>When setting any parameters randomly or using the random button,
+    you should always set your speaker volume to minimum or off before setting.
+    Then apply sound to Rakarrack-plus and watch the output volume meter.
+    Setting parameters randomly can result in feedback as well as other issues
+    that will maximize the volume!!!</p>
 
-
+<p><b>Bank Window</b><p/>
 <p><img src="imagenes/bank_mgmt.jpg" alt="rakarrack Bank Window" align="bottom" border="1" height="500" width="640"></p>
 
-<p>At the top of the Bank windows, the title bar shows the loaded bank.
+<p>At the top of the Bank window, the title bar shows the loaded bank.
 Click on the individual preset buttons or use the preset counter in the Preset
 section to change the preset. The hot keys '+' and '-' can also be used to cycle
 through the presets.</p>
@@ -406,8 +428,53 @@ Harmonizer effect. This means you need to play a monophonic melody in
 the Key/Chord selected. The harmonizer recognizes what note you play
 and creates a second voice in the Key/Chord selected.</p>
 
+<p><b>Save Bank</b></p>
+<p>Save the currently selected bank showing on the bank window. Ctrl-S can be 
+used for the keyboard shortcut. You cannot save the default program banks, so if
+you want to save any changes to the default banks, use File/Save. All user 
+banks MUST be saved in the user directory <a href="#bprefs">User preferences</a>.
+See "User Banks" below for recommended file saving naming for MIDI bank select.
+Upon successful saving a brief message will display above the bank presets
+indicating the file has been saved and the name and path</p>
+
+<p><b>New Bank</b><p/>
+<p>Select button for clearing the bank presets buttons for new user banks.</p>
+
+<p><b>R</b></p>
+<p>Reload the User Banks. <b>WARNING:</b> This will re-load the currently active bank.
+You will not be prompted for any modified changes. All modifications to the currently
+active bank will be lost! Select this button to refresh the "User Banks" choice list
+and update all user banks for any changes made since the program started. Useful if
+there have been changes to the user banks outside the current program instance. For
+example, from a second rakarrack-plus instance.</p>
+
+<p><b>MIDI Program Select</b></p>
+<p>The number in [XX] brackets preceeding the label is the MIDI program change
+    number that must be sent to select the indicated preset.</p>
+
+<p><b>User Banks</b></p>
 <p> The "User Banks" choice displays the available user banks that are in the
-directory specified by <a href="#bprefs">User Directory</a> in Bank preferences.</p>
+directory specified by <a href="#bprefs">User Directory</a> in User preferences.</p>
+<p>User banks are loaded on program start by scan of the user directory. The files
+are selected by .rkrb extension and will appear in the choice display in alpha
+numeric order. The first six CC 0 Bank Select parameters are reserved for
+the program provided default banks. From CC 0, parameters 6~127 can be used
+for user banks. For best results, files could be named using CC parameter value (PV).</p>
+
+    <p>For example:</p>
+  <ul>
+      <li>
+          <p> PV_06_Mybank.rkrb</p>
+      </li>
+      <li>
+          <p> PV_07_Another.rkrb</p>
+      </li>
+  </ul>
+
+<p><b>MIDI Bank Select</b></p>
+<p>The number in [XX] brackets preceeding the bank label is the MIDI CC 0,
+    Bank Selection parameter value to send for MIDI bank select.</p>
+
 
 <p><a href="general.html">General</a></p>
 <p><a href="help.html">Table of Contents</a></p>
@@ -435,10 +502,10 @@ plastic schemes.</p>
 </p>
 
 <p><b>Font</b></p>
-<p>Select the label font for the main window.</p>
+<p>Select the label font for the entire program. You can alpha search as well as
+use the up and down arrows. The Font type will automatically change on each selection</p>
 <p><b>Font Size</b></p>
-<p>Increase/Decrease the font size of all windows. The Reset
-button will set the value to default of "10 point". Beginning with
+<p>Increase/Decrease the font size of all windows.  Beginning with
 Rakarrack-plus the fonts are now auto resized. You likely will
 not need to adjust the font sizes unless you choose an extra large
 or small font type.</p>
@@ -456,6 +523,9 @@ normally in "/usr/share/rakarrack-plus" or "/usr/local/share/rakarrack-plus".</p
 <p>Check this button if you want the main window to resize according to the
 default width X height scale. This may give better results for font resizing 
 in some cases. Un-check to allow full resize capability.
+
+<p><b>Reset</b></p>
+Select the Reset button to revert all 'Look' items to the defaults.
 
 <p>The Skin save/load menu options located in the main
 menu, save or restore the rakarrack-plus look. If you have made a nice look
@@ -738,7 +808,12 @@ control message will be assigned "automatically".
 <p>Use the scroll table to select the Bank/Preset you want when a MIDI Program change
 message is received (0~127). If the option is disabled rakarrack-plus will only
 recognize program change (1~60) in the current bank. Use the Save and Load
-buttons for saving and loading multiple user defined program change tables.</p>
+buttons for saving and loading multiple user defined program change tables.
+You can also use MIDI CC 32 (Bank Select (fine)) for selecting the table with MIDI.
+All program change tables must be placed in the User directory to be used.
+These tables are selected by .rmt extension and will be sorted alpha-numeric
+for MIDI CC 32 selection. For best results, the file name should be based on
+the CC 32 parameter value Ex: PG_00_My_Table.rmt, PG_01_Another_Table.rmt.</p>
 
 
 <p><a href="general.html">General</a></p>
@@ -761,6 +836,46 @@ buttons for saving and loading multiple user defined program change tables.</p>
 <h2>Misc Preferences</h2>
 <p><img alt="Settings Misc" src="imagenes/settings4.jpg"></p>
 
+<p><b>Disable Warning</b></p>
+<p>Check this box to disable warning and error messages.</p>
+
+<p><b>Tap Tempo Timeout</b></p>
+<p>Check this box to enable the Tap Tempo timeout. If it is enabled, the tap tempo
+will shut off if no (tap) input is received for 8 seconds after the last signal.</p>
+
+<p><b>Enable Tooltips</b></p>
+<p>Check this box to enable rakarrack-plus tooltips.</p>
+
+<p><b>Focus Delay</b></p>
+<p>Set the delay time to automatically focus of the widget under the mouse pointer.
+The mouse focus setting is disabled by default.</p>
+
+<p><b>NSM Single State</b></p>
+<p>Check this box if you want NSM session to always save the last state of the active preset.
+This will save all changes to effects including MIDI control changes. The default behaver
+will not save changes to the active preset as the changes are assumed to be for live 
+performance reasons. This check box is de-activated when not in NSM mode.</p>
+
+<p><a href="general.html">General</a></p>
+<p><a href="help.html">Table of Contents</a></p>
+
+<h2><a name="bprefs"></a>User Preferences</h2>
+<p><img alt="Settings Bank" src="imagenes/settings5.jpg"></p>
+<p><b>User Directory</b></p>
+<p>Specify the directory where rakarrack-plus should look for user files. 
+The following user files MUST be placed in the user directory or the program
+will generate an error message, and the file cannot be used:</p>
+<ul>
+    <li> <p>User Banks</p></li>
+    <li> <p>Convolotron .wav files</p></li>
+    <li> <p>Echotron .dly files</p></li>
+    <li> <p>Reverbtron .rvb files</p></li>
+    <li> <p>Program change tables</p></li>
+</ul>
+<p><b>Bank Filename</b></p>
+<p>Specify the file for the bank file to be loaded and associated to the "U"
+button. This file MUST be located in the user directory.</p>
+
 <p><b>Author</b></p>
 <p>Here you can define a nickname to be used for new presets that are created.
 The development team intends to create banks of effects created by users.
@@ -769,31 +884,8 @@ These presets should assume the same license with which this program is released
 Last Name (nick). Of course you have to give a descriptive name to
 your preset. If you have a good preset and want to share or want it to
 be included in future versions, send it to this address
-<a href="mailto:holborn@users.sourceforge.net">holborn@users.sourceforge.net</a></p>
+<a href="https://github.com/Stazed/rakarrack-plus">https://github.com/Stazed/rakarrack-plus</a></p>
 
-<p><b>Disable Warning</b></p>
-<p>Check this box to disable warning and error messages.</p>
-
-<p><b>Tap Tempo Timeout</b></p>
-
-
-<p>Check this box to enable the Tap Tempo timeout. If it is enabled, the tap tempo
-will shut off if no (tap) input is received for 8 seconds after the last signal.</p>
-
-<p><b>Enable Tooltips</b></p>
-<p>Check this box to enable rakarrack-plus tooltips.</p>
-
-<p><a href="general.html">General</a></p>
-<p><a href="help.html">Table of Contents</a></p>
-
-<h2><a name="bprefs"></a>Bank Preferences</h2>
-<p><img alt="Settings Bank" src="imagenes/settings5.jpg"></p>
-<p><b>Bank Filename</b></p>
-<p>Specify the directory and file for the bank file to be loaded and
-associated to the "U" button when the program starts.</p>
-<p><b>User Directory</b></p>
-<p>Specify the directory where rakarrack-plus should look for user banks that
-will be displayed in the Bank Window "User Banks" scroll choice.</p>
 
 <p><a href="general.html">General</a></p>
 <p><a href="help.html">Table of Contents</a></p>
@@ -811,48 +903,52 @@ will be displayed in the Bank Window "User Banks" scroll choice.</p>
       <th>Function</th>
     </tr>
     <tr>
-      <td>R</td>
-      <td>Enable rakarrack-plus</td>
+      <td> R </td>
+      <td> Rakarrack-plus Master On/Off </td>
     </tr>
     <tr>
       <td>T</td>
-      <td>Enable Tuner</td>
+      <td> Tuner On/Off </td>
     </tr>
     <tr>
       <td> M </td>
-      <td> Enable MIDI Converter </td>
+      <td> MIDI Converter On/Off </td>
     </tr>
     <tr>
       <td> M </td>
-      <td> Enable Metronome </td>
+      <td> Metronome On/Off </td>
     </tr>
     <tr>
       <td> H </td>
-      <td> Enable Tap Tempo </td>
+      <td> Tap Tempo On/Off </td>
     </tr>
     <tr>
-      <td> L </td>
-      <td> Open the load preset window </td>
+      <td> I </td>
+      <td> Import Preset </td>
     </tr>
     <tr>
-      <td> S </td>
-      <td> Open the save preset window </td>
+      <td> E </td>
+      <td> Export Preset </td>
+    </tr>
+    <tr>
+      <td> Ctrl+S </td>
+      <td> Save Bank File </td>
     </tr>
     <tr>
       <td> B </td>
-      <td> Open the bank window </td>
+      <td> Show/Hide the Bank Window </td>
     </tr>
     <tr>
       <td> G </td>
       <td> Tap Tempo set </td>
     </tr>
     <tr>
-      <td>E </td>
-      <td>Open the MIDI Learn Window </td>
+      <td> L </td>
+      <td> Open the MIDI Learn Window </td>
     </tr>
     <tr>
-      <td> I </td>
-      <td> Open the Settings window </td>
+      <td> J </td>
+      <td> Open the Settings Window </td>
     </tr>
     <tr>
       <td> O </td>
@@ -880,7 +976,7 @@ will be displayed in the Bank Window "User Banks" scroll choice.</p>
     </tr>
     <tr>
       <td> F2 </td>
-      <td> Decrease -1 the Output Volume</td>
+      <td> Decrease the Output Volume</td>
     </tr>
     <tr>
       <td> F3 </td>
@@ -913,7 +1009,7 @@ will be displayed in the Bank Window "User Banks" scroll choice.</p>
     </tr>
     <tr>
       <td> F12 </td>
-      <td> FullScreen </td>
+      <td> Toggle Full Screen </td>
     </tr>
     <tr>
       <td> Insert </td>
@@ -959,22 +1055,22 @@ with the space bar keys.</p>
 
 <h3><a name="session"></a>Session Support</h3>
 
-<p>Rakarrack-plus supports Jack session management and SIGUSR1 & SIGINT signal capture.
-For session management, only the active current preset is saved per session. Use
-SIGUSR1 for preset saving and SIGINT to quit without saving. LADISH and Non Session
-Manager (NSM) are able to send SIGUSR1 and SIGINT signals. For signal capture, use the
-<a href="#cmd">Command line options</a> -p preset option to set the file to save.
-For NSM use the NSM Proxy to set command line options.</p>
+<p>Rakarrack-plus supports NSM, both Non Session Manager as well as New Session
+Manager.
+For session management, the current instance Settings/Preferences are saved as well as last
+used bank and preset. In addition, gui show/hide is supported. All bank, user files,
+Program Change table and "Insert" presets are global to all instances.
+For each Rakarrack-plus instance in the NSM session you must set the User bank in
+Settings/Preferences/User to your global user bank. SIGUSR1(save) and SIGINT(quit) signals
+can also be used for session support.
+</p>
 
-<p>Rakarrack-plus supports multiple occurrences of the program. By default jack will
-name each occurrence with the same name by appending the occurrence number to
-the name: ex "rakarrack-plus-01". For NSM support, using multiple occurrences, the 
-manager will not always start each occurrence in the same order for each session.
-This will result in occasional incorrect jack connections being made from different
-sessions. To solve this problem, use the Command line option "-j Name" to set the
-rakarrack-plus client name to a unique id for each occurrence.</p>
-
-
+<p><b>NSM Single State</b></p>
+<p>In Settings/Preferences/Misc: Check this box if you want NSM session to always save the
+last state of the active preset.
+This will save all changes to effects including MIDI control changes. The default behaver
+will not save changes to the active preset as the changes are assumed to be for live 
+performance reasons. This check box is de-activated when not in NSM mode.</p>
 
 <p><a href="general.html">General</a></p>
 <p><a href="help.html">Table of Contents</a> - <a href="effects.html">Effects</a></p>

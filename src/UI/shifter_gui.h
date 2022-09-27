@@ -6,12 +6,12 @@
 #include "RKR_Light_Button.h"
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 
-class ShifterGui : public Fl_Group {
+class ShifterGui : public RKR_Gui_Effect {
 public:
   ShifterGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *shifter_activar;
@@ -75,5 +75,7 @@ private:
   inline void cb_shifter_mode_i(RKR_Choice*, void*);
   static void cb_shifter_mode(RKR_Choice*, void*);
   static Fl_Menu_Item menu_shifter_mode[];
+public:
+  void parameter_refresh(int index);
 };
 #endif

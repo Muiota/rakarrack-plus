@@ -6,13 +6,13 @@
 #include "RKR_Light_Button.h"
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 #include "common_gui_menu.h"
 
-class PanGui : public Fl_Group {
+class PanGui : public RKR_Gui_Effect {
 public:
   PanGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *pan_activar;
@@ -71,5 +71,8 @@ private:
   inline void cb_pan_extra_i(RKR_Slider*, void*);
   static void cb_pan_extra(RKR_Slider*, void*);
   CommonGuiMenu *m_lfo_menu; 
+public:
+  void parameter_refresh(int index);
+  void tap_tempo_update();
 };
 #endif

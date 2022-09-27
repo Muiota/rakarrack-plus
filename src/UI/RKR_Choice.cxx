@@ -34,17 +34,21 @@ RKR_Choice::RKR_Choice(int X, int Y, int W, int H, const char *label) :
     m_start_y(Y),
     m_start_width(W),
     m_start_height(H),
-    m_previous_font_size(global_font_size)
+    m_look_changed(0)
 {
-    //    this->user_data((void*)(BUTTON_USER_DATA));
+    this->user_data((void*)(UD_RKR_Highlight));
 }
 
 void RKR_Choice::draw()
 {
-    /* To update the font size if user changes the value in settings */
-    if (global_font_size != m_previous_font_size)
+    if(m_look_changed != global_look_changed)
     {
-        m_previous_font_size = global_font_size;
+        m_look_changed = global_look_changed;
+
+        color(global_fore_color);
+        labelcolor(global_label_color);
+        textcolor(global_label_color);
+        labelfont(global_font_type);
         font_resize(w(), h());
     }
 
@@ -217,12 +221,11 @@ void RKR_Choice::font_resize(int W, int H)
         return;
     }
 
-    Fl_Menu_Item *p;
-
     for (int s = 0; s < m->size(); s++)
     {
-        p = m->next(s);
+        Fl_Menu_Item *p = m->next(s);
         p->labelsize(adjusted_text_size); /* Drop down menus - menu list items */
+        p->labelfont (global_font_type);
     }
 
     textsize(adjusted_text_size);

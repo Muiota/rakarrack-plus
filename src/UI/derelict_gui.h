@@ -6,13 +6,13 @@
 #include "RKR_Light_Button.h"
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 #include "common_gui_menu.h"
 
-class DerelictGui : public Fl_Group {
+class DerelictGui : public RKR_Gui_Effect {
 public:
   DerelictGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *derelict_activar;
@@ -86,5 +86,7 @@ private:
   inline void cb_derelict_hpf_i(RKR_Slider*, void*);
   static void cb_derelict_hpf(RKR_Slider*, void*);
   CommonGuiMenu *m_dist_menu; 
+public:
+  void parameter_refresh(int index);
 };
 #endif

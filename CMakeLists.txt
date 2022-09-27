@@ -1,19 +1,19 @@
-#CMake file for Rakarrack & LV2
+#CMake file for Rakarrack-plus & LV2
 
 cmake_minimum_required(VERSION 3.1)
 project (rakarrack-plus)
 
-set (PACKAGE_VERSION "1.0.0")
+set (PACKAGE_VERSION "1.2.3")
 
 set (CMAKE_SKIP_RULE_DEPENDENCY OFF)
 
-add_definitions (-D'VERSION="${PACKAGE_VERSION}"')
+add_definitions(-D'VERSION="${PACKAGE_VERSION}"')
 add_definitions(-D'WEBSITE="github.com.Stazed.rakarrack.plus"')
 add_definitions(-D'PACKAGE="rakarrack-plus"')
 add_definitions(-D'DATADIR="${CMAKE_INSTALL_PREFIX}/share/rakarrack-plus"')
 add_definitions(-D'HELPDIR="${CMAKE_INSTALL_PREFIX}/share/doc/rakarrack-plus"')
 
-include (CheckCSourceCompiles)
+include(CheckCSourceCompiles)
 include(CheckCXXCompilerFlag)
 
 check_cxx_compiler_flag("-msse2" SUPPORT_SSE)
@@ -23,6 +23,8 @@ check_cxx_compiler_flag("-maltivec" SUPPORT_ALTIVEC)
 option (BuildRakarrackPlus "Build rakarrack-plus" ON)
 option (BuildLV2Plugins "Build rakarack-plus lv2 plugins (RakarrackPlus.lv2)" ON)
 option (BuildCarlaPresets "Build Carla presets for lv2 from default banks" OFF)
+option (EnableNSM "Enable NSM session support" ON)
+option (EnableSysex "Enable Experimental Sysex preset save support" OFF)
 option (BuildForDebug "Include gdb debugging support" OFF)
 option (EnableOptimizations "Enable optimizations" ON)
 option (EnableSSE "Enable SSE (default=automatic check)" ON)
@@ -43,15 +45,24 @@ set (BuildOptions_SSE2
     CACHE STRING "SSE2 compiler options"
 )
 
-set(BuildOptions_Vectorization
-    "-ftree-vectorize -fvect-cost-model"
-    CACHE STRING "Vectorization compiler options"
-)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    MESSAGE("USING CLANG OPTIMIZATIONS")
+    set(BuildOptions_Vectorization
+        "-ftree-vectorize"
+        CACHE STRING "Vectorization compiler options"
+    )
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    MESSAGE("USING GNU OPTIMIZATIONS")
+    set(BuildOptions_Vectorization
+        "-ftree-vectorize -fvect-cost-model"
+        CACHE STRING "Vectorization compiler options"
+    )
 
-set(BuildOptions_Altivec
-    "-maltivec"
-    CACHE STRING "Altivec compiler options"
-)
+    set(BuildOptions_Altivec
+        "-maltivec"
+        CACHE STRING "Altivec compiler options"
+    )
+endif()
 
 set (BuildOptionsBasic
     "-std=c++11 -Wno-unused-parameter -O3 -ffast-math -pipe -fsigned-char"
@@ -63,29 +74,12 @@ set (BuildOptionsDebug
     CACHE STRING "Debug build flags"
 )
 
-
-# Check for jack session availability
-check_c_source_compiles (
-    "#include <jack/session.h>
-    int main(int argc, char **argv)
-    {
-        jack_session_event_type_t x = JackSessionSave;
-        return 0;
-    }" HasJackSession
-)
-
-if (HasJackSession)
-    option (EnableJackSessionSupport "Include Jack Session Support" ON)
-else (HasJackSession)
-    set (EnableJackSessionSupport OFF)
-endif (HasJackSession)
-
 find_package (PkgConfig REQUIRED)
 
 #dependencies
 SET(FLTK_SKIP_OPENGL TRUE) 
-find_package (FLTK REQUIRED)
-find_package (ALSA REQUIRED alsa>=1.0.17)
+find_package(FLTK REQUIRED)
+find_package(ALSA REQUIRED alsa>=1.0.17)
 find_package(X11 REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(ZLIB REQUIRED)
@@ -95,14 +89,30 @@ if(THREADS_HAVE_PTHREAD_ARG)
   set_property(TARGET rakarrack-plus PROPERTY INTERFACE_COMPILE_OPTIONS "-pthread")
 endif()
 
-pkg_check_modules (JACK REQUIRED jack>=0.115.6)
-pkg_check_modules (FONTCONFIG REQUIRED fontconfig>=0.22)
-pkg_check_modules (FFTW3 REQUIRED fftw3>=0.22 fftw3f>=0.22)
+pkg_check_modules(JACK REQUIRED jack>=0.115.6)
+pkg_check_modules(FONTCONFIG REQUIRED fontconfig>=0.22)
+pkg_check_modules(FFTW3 REQUIRED fftw3>=0.22 fftw3f>=0.22)
 pkg_check_modules(SNDFILE REQUIRED sndfile)
 pkg_check_modules(SAMPLERATE REQUIRED samplerate>=0.1.5)
 pkg_check_modules(XFT REQUIRED xft)
 pkg_check_modules(XRENDER REQUIRED xrender)
 pkg_check_modules(XPM REQUIRED xpm)
+
+if (EnableNSM)
+    pkg_check_modules(LIBLO liblo>=0.26 REQUIRED)
+    if (LIBLO_FOUND)
+        add_definitions(-D'NSM_SUPPORT=1')
+        mark_as_advanced (LIBLO)
+    endif (LIBLO_FOUND)
+endif (EnableNSM)
+
+if (BuildCarlaPresets)
+    find_package(
+            Python3
+            REQUIRED
+            COMPONENTS Interpreter
+    )
+endif (BuildCarlaPresets)
 
 find_program(ACONNECT aconnect)
 if (ACONNECT)
@@ -145,8 +155,12 @@ mark_as_advanced (FLTK_MATH_LIBRARY)
 mark_as_advanced (LIBDL)
 mark_as_advanced (LIBRT)
 
+if(EnableSysex)
+    add_definitions(-D'SYSEX_SUPPORT=1')
+endif (EnableSysex)
+
 if(BuildRakarrackPlus)
-    install(FILES COPYING AUTHORS ChangeLog NEWS README PACKAGERS.README
+    install(FILES COPYING AUTHORS ChangeLog NEWS README README.md PACKAGERS.README
         DESTINATION share/doc/rakarrack-plus)
 endif(BuildRakarrackPlus)
 #TODO move from /data to main
@@ -185,7 +199,7 @@ else (BuildForDebug)
         if (SUPPORT_ALTIVEC)
             if(EnableAltivec)
                 set (USE_ALTIVEC "${SUPPORT_ALTIVEC}")
-                set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} $[BuildOptions_Altivec}")
+                set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${BuildOptions_Altivec}")
             endif(EnableAltivec)
         endif (SUPPORT_ALTIVEC)
     else(EnableOptimizations)
@@ -196,20 +210,11 @@ else (BuildForDebug)
     endif(EnableOptimizations)
 endif (BuildForDebug)
 
-if(BuildRakarrackPlus)
-    add_subdirectory(src)
-    add_subdirectory(man)
-    add_subdirectory(data)
-    add_subdirectory(icons)
-    add_subdirectory(doc)
-    add_subdirectory(extra)
-endif (BuildRakarrackPlus)
-
 if (BuildLV2Plugins)
     pkg_check_modules(LV2 REQUIRED lv2>=1.0.0)
     if (LV2_FOUND)
-        if (EXISTS $ENV{LV2_PATH})
-            set(LV2_INSTALL_DIR $ENV{LV2_PATH} CACHE PATH
+        if (DEFINED LV2_PATH)
+            set(LV2_INSTALL_DIR "${LV2_PATH}/RakarrackPlus.lv2" CACHE PATH
             "Specifies where the LV2 libraries should be installed")
         else()
             set(LV2_INSTALL_DIR lib/lv2/RakarrackPlus.lv2 CACHE PATH
@@ -236,7 +241,7 @@ if (BuildLV2Plugins)
         endforeach(INDX)
         # 2 more dly file 
         list(GET DLY 10 NEWNAME)
-        configure_file(data/11.dly lv2data/${NEWNAME}.dly COPYONLY)
+        configure_file(data/10.dly lv2data/${NEWNAME}.dly COPYONLY)
         list(GET DLY 11 NEWNAME)
         configure_file(data/11.dly lv2data/${NEWNAME}.dly COPYONLY)
 
@@ -249,6 +254,15 @@ if (BuildLV2Plugins)
 else (BuildLV2Plugins)
     set (BuildCarlaPresets OFF)
 endif (BuildLV2Plugins)
+
+if(BuildRakarrackPlus)
+    add_subdirectory(src)
+    add_subdirectory(man)
+    add_subdirectory(data)
+    add_subdirectory(icons)
+    add_subdirectory(doc)
+    add_subdirectory(extra)
+endif (BuildRakarrackPlus)
 
 
 ##Summarize The Full Configuration
@@ -291,6 +305,10 @@ package_status(XFT_FOUND           "Xft support. . . . . . . . . . . . . . . . .
 package_status(XRENDER_FOUND       "Xrender support. . . . . . . . . . . . . . . . . . . . .:"  )
 package_status(XPM_FOUND           "Xpm support (libxpm) . . . . . . . . . . . . . . . . . .:"  )
 
+if (EnableNSM)
+    package_status(LIBLO_FOUND         "Liblo support. . . . . . . . . . . . . . . . . . . . . .:"  )
+endif(EnableNSM)
+
 if(BuildLV2Plugins)
     package_status(LV2_FOUND           "LV2 support. . . . . . . . . . . . . . . . . . . . . . .:"  )
 endif(BuildLV2Plugins)
@@ -306,8 +324,14 @@ package_status(BuildRakarrackPlus  "Build Rakarrack-plus . . . . . . . . . . . .
 package_status(BuildLV2Plugins     "Build LV2s (RakarrackPlus.lv2) . . . . . . . . . . . . .:"  )
 package_status(BuildCarlaPresets   "Build Carla lv2 presets. . . . . . . . . . . . . . . . .:"  )
 package_status(BuildForDebug       "Build for debug. . . . . . . . . . . . . . . . . . . . .:"  )
-package_status(EnableJackSessionSupport "JACK Session support . . . . . . . . . . . . . . . . . .:"  )
+package_status(EnableNSM           "NSM session support. . . . . . . . . . . . . . . . . . .:"  )
+package_status(EnableSysex         "Sysex preset save support. . . . . . . . . . . . . . . .:"  )
 
 message (STATUS)
 message (STATUS)
-message (STATUS "Building for ${CMAKE_BUILD_TYPE}, flags: ${CMAKE_CXX_FLAGS_RELEASE}")
+message (STATUS "Building for ${CMAKE_BUILD_TYPE}")
+if (BuildForDebug)
+    message (STATUS "Flags: ${CMAKE_CXX_FLAGS_DEBUG}")
+else (BuildForDebug)
+    message (STATUS "Flags: ${CMAKE_CXX_FLAGS_RELEASE}")
+endif (BuildForDebug)

@@ -30,8 +30,9 @@
 #include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
 
-#define BOX_USER_DATA   99997
-#define BOX_LED_DATA    5
+#define BOX_DEFAULT     0
+#define BOX_LEDS        1
+#define BOX_LIGHT       2
 
 class RKR_Box : public Fl_Box
 {
@@ -39,11 +40,13 @@ public:
     RKR_Box(int X, int Y, int W, int H, const char *label=0);
     void draw();
     void resize(int,int,int,int);
+    int handle(int);
     int get_start_height(){return m_start_height;};
     int get_start_width(){return m_start_width;};
     int get_start_x(){return m_start_x;};
     int get_start_y(){return m_start_y;};
     void set_label_offset(int offset){m_label_offset = offset;};
+    void set_box_type(int type) {m_box_type = type;};
 
 private:
 
@@ -52,7 +55,8 @@ private:
     int m_start_y;
     int m_start_width;
     int m_start_height;
-    int m_previous_font_size;
+    int m_box_type;
+    int m_look_changed;
     void font_resize(int,int);
 
 };

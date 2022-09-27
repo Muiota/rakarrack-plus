@@ -3,16 +3,16 @@
 #include "looper_gui.h"
 
 void LooperGui::cb_looper_activar_i(RKR_Light_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Looper_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_LOOPER]);
  return;
 }
-rkr->Looper_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_LOOPER]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_Looper->cleanup();
-rgui->findpos(30,(int)o->value(),o);
+m_process->Rack_Effects[EFX_LOOPER]->cleanup();
+m_parent->findpos(EFX_LOOPER,(int)o->value(),o);
 }
 void LooperGui::cb_looper_activar(RKR_Light_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_activar_i(o,v);
@@ -20,23 +20,25 @@ void LooperGui::cb_looper_activar(RKR_Light_Button* o, void* v) {
 
 void LooperGui::cb_looper_preset_i(RKR_Choice* o, void* v) {
   long long ud= (long long) v;
-if((ud==0)||(ud==12030))rkr->efx_Looper->setpreset((int) o->value());
-looper_WD->value(Dry_Wet(rkr->efx_Looper->getpar(0)));
-looper_play->value(rkr->efx_Looper->getpar(1));
-looper_record->value(rkr->efx_Looper->getpar(3));
-looper_rv->value(rkr->efx_Looper->getpar(5));
-looper_ap->value(rkr->efx_Looper->getpar(9));
-looper_level1->value(rkr->efx_Looper->getpar(6));
-looper_level2->value(rkr->efx_Looper->getpar(10));
+if((ud==0)||(ud==UD_PRESET_LOOPER))
+    m_process->Rack_Effects[EFX_LOOPER]->setpreset((int) o->value());
+    
+looper_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_DryWet)));
+looper_play->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Play));
+looper_record->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Record));
+looper_rv->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Reverse));
+looper_ap->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_AutoPlay));
+looper_level1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Level_1));
+looper_level2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Level_2));
 
-looper_t1->value(rkr->efx_Looper->getpar(7));
-looper_t2->value(rkr->efx_Looper->getpar(8));
-looper_r1->value(rkr->efx_Looper->getpar(11));
-looper_r2->value(rkr->efx_Looper->getpar(12));
-looper_lnk->value(rkr->efx_Looper->getpar(13));
-looper_Tempo->value(rkr->efx_Looper->getpar(14));
-looper_bar->value(rkr->efx_Looper->getpar(15));
-looper_ms->value(rkr->efx_Looper->getpar(17));
+looper_t1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Track_1));
+looper_t2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Track_2));
+looper_r1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Rec_1));
+looper_r2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Rec_2));
+looper_lnk->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Link));
+looper_Tempo->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Tempo));
+looper_bar->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Bar));
+looper_ms->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_M_S));
 }
 void LooperGui::cb_looper_preset(RKR_Choice* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_preset_i(o,v);
@@ -49,214 +51,218 @@ Fl_Menu_Item LooperGui::menu_looper_preset[] = {
 };
 
 void LooperGui::cb_looper_WD_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(267);
+ m_parent->getMIDIControl(MC_Looper_DryWet);
  return;
 }
-rkr->efx_Looper->changepar(0,Dry_Wet((int)(o->value())));
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_DryWet,Dry_Wet((int)(o->value())));
 }
 void LooperGui::cb_looper_WD(RKR_Slider* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_WD_i(o,v);
 }
 
 void LooperGui::cb_looper_level1_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(268);
+ m_parent->getMIDIControl(MC_Looper_Level_1);
  return;
 }
-rkr->efx_Looper->changepar(6,(int)o->value());
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Level_1,(int)o->value());
 }
 void LooperGui::cb_looper_level1(RKR_Slider* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_level1_i(o,v);
 }
 
 void LooperGui::cb_looper_level2_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(269);
+ m_parent->getMIDIControl(MC_Looper_Level_2);
  return;
 }
-rkr->efx_Looper->changepar(10,(int)o->value());
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Level_2,(int)o->value());
 }
 void LooperGui::cb_looper_level2(RKR_Slider* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_level2_i(o,v);
 }
 
 void LooperGui::cb_looper_Tempo_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(423);
+ m_parent->getMIDIControl(MC_Looper_Tempo);
  return;
 }
-rkr->efx_Looper->changepar(14,(int)o->value());
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Tempo,(int)o->value());
 }
 void LooperGui::cb_looper_Tempo(RKR_Slider* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_Tempo_i(o,v);
 }
 
 void LooperGui::cb_looper_bar_i(RKR_Choice* o, void*) {
-  rkr->efx_Looper->changepar(15,(int)o->value());
+  m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Bar,(int)o->value());
 }
 void LooperGui::cb_looper_bar(RKR_Choice* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_bar_i(o,v);
 }
 
 void LooperGui::cb_looper_ms_i(RKR_Choice* o, void*) {
-  rkr->efx_Looper->changepar(17,(int)o->value());
+  m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_M_S,(int)o->value());
 }
 void LooperGui::cb_looper_ms(RKR_Choice* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_ms_i(o,v);
 }
 
 void LooperGui::cb_looper_rv_i(RKR_Check_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(270);
+ m_parent->getMIDIControl(MC_Looper_Reverse);
  return;
 }
-rkr->efx_Looper->changepar(5,(int)o->value());
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Reverse,(int)o->value());
 }
 void LooperGui::cb_looper_rv(RKR_Check_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_rv_i(o,v);
 }
 
 void LooperGui::cb_looper_ap_i(RKR_Check_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(271);
+ m_parent->getMIDIControl(MC_Looper_AutoPlay);
  return;
 }
-rkr->efx_Looper->changepar(9,(int)o->value());
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_AutoPlay,(int)o->value());
 }
 void LooperGui::cb_looper_ap(RKR_Check_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_ap_i(o,v);
 }
 
 void LooperGui::cb_looper_play_i(RKR_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(272);
+ m_parent->getMIDIControl(MC_Looper_Play);
  return;
 }
-rkr->efx_Looper->changepar(1,(int)o->value());
-rgui->update_looper();
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Play,(int)o->value());
+m_parent->update_looper();
 }
 void LooperGui::cb_looper_play(RKR_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_play_i(o,v);
 }
 
 void LooperGui::cb_looper_stop_i(RKR_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(273);
+ m_parent->getMIDIControl(MC_Looper_Stop);
  return;
 }
-rkr->efx_Looper->changepar(2,(int)o->value());
-rgui->update_looper();
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Stop,(int)o->value());
+m_parent->update_looper();
 }
 void LooperGui::cb_looper_stop(RKR_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_stop_i(o,v);
 }
 
 void LooperGui::cb_looper_record_i(RKR_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(274);
+ m_parent->getMIDIControl(MC_Looper_Record);
  return;
 }
-rkr->efx_Looper->changepar(3,(int)o->value());
-rgui->update_looper();
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Record,(int)o->value());
+m_parent->update_looper();
 }
 void LooperGui::cb_looper_record(RKR_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_record_i(o,v);
 }
 
 void LooperGui::cb_looper_r1_i(RKR_Check_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(275);
+ m_parent->getMIDIControl(MC_Looper_Rec_1);
  return;
 }
-rkr->efx_Looper->changepar(11,(int)o->value());
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Rec_1,(int)o->value());
 }
 void LooperGui::cb_looper_r1(RKR_Check_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_r1_i(o,v);
 }
 
 void LooperGui::cb_looper_r2_i(RKR_Check_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(276);
+ m_parent->getMIDIControl(MC_Looper_Rec_2);
  return;
 }
-rkr->efx_Looper->changepar(12,(int)o->value());
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Rec_2,(int)o->value());
 }
 void LooperGui::cb_looper_r2(RKR_Check_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_r2_i(o,v);
 }
 
 void LooperGui::cb_looper_t1_i(RKR_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(277);
+ m_parent->getMIDIControl(MC_Looper_Track_1);
  return;
 }
-rkr->efx_Looper->changepar(7,(int)o->value());
-rgui->update_looper();
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Track_1,(int)o->value());
+m_parent->update_looper();
 }
 void LooperGui::cb_looper_t1(RKR_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_t1_i(o,v);
 }
 
 void LooperGui::cb_looper_t2_i(RKR_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(278);
+ m_parent->getMIDIControl(MC_Looper_Track_2);
  return;
 }
-rkr->efx_Looper->changepar(8,(int)o->value());
-rgui->update_looper();
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Track_2,(int)o->value());
+m_parent->update_looper();
 }
 void LooperGui::cb_looper_t2(RKR_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_t2_i(o,v);
 }
 
 void LooperGui::cb_looper_lnk_i(RKR_Check_Button* o, void*) {
-  rkr->efx_Looper->changepar(13,(int)o->value());
+  m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Link,(int)o->value());
 }
 void LooperGui::cb_looper_lnk(RKR_Check_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_lnk_i(o,v);
 }
 
 void LooperGui::cb_looper_clear_i(RKR_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(279);
+ m_parent->getMIDIControl(MC_Looper_Clear);
  return;
 }
-rkr->efx_Looper->changepar(4,(int)o->value());
-rgui->update_looper();
+m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Clear,(int)o->value());
+m_parent->update_looper();
 }
 void LooperGui::cb_looper_clear(RKR_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_clear_i(o,v);
 }
 
 void LooperGui::cb_looper_mt_i(RKR_Check_Button* o, void*) {
-  rkr->efx_Looper->changepar(16,(int)o->value());
+  m_process->Rack_Effects[EFX_LOOPER]->changepar(Looper_Metro,(int)o->value());
 }
 void LooperGui::cb_looper_mt(RKR_Check_Button* o, void* v) {
   ((LooperGui*)(o->parent()))->cb_looper_mt_i(o,v);
 }
 LooperGui::LooperGui(int X, int Y, int W, int H, const char *L)
-  : Fl_Group(0, 0, W, H, L) {
+  : RKR_Gui_Effect(0, 0, W, H, L) {
 this->box(FL_UP_BOX);
 this->color(FL_FOREGROUND_COLOR);
 this->selection_color(FL_FOREGROUND_COLOR);
-this->user_data((void*)(1));
+this->labeltype(FL_NO_LABEL);
+this->labelfont(0);
+this->labelsize(14);
+this->labelcolor(FL_FOREGROUND_COLOR);
 this->align(Fl_Align(96|FL_ALIGN_INSIDE));
-{ looper_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
+this->when(FL_WHEN_RELEASE);
+{ RKR_Light_Button* o = looper_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
   looper_activar->box(FL_UP_BOX);
   looper_activar->shortcut(0x35);
   looper_activar->color((Fl_Color)62);
@@ -265,11 +271,12 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_activar->labelfont(0);
   looper_activar->labelsize(10);
   looper_activar->labelcolor(FL_FOREGROUND_COLOR);
-  looper_activar->callback((Fl_Callback*)cb_looper_activar, (void*)(2));
+  looper_activar->callback((Fl_Callback*)cb_looper_activar);
   looper_activar->align(Fl_Align(68|FL_ALIGN_INSIDE));
   looper_activar->when(FL_WHEN_CHANGED);
+  activate_effect = o;
 } // RKR_Light_Button* looper_activar
-{ looper_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
+{ RKR_Choice* o = looper_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
   looper_preset->box(FL_FLAT_BOX);
   looper_preset->down_box(FL_BORDER_BOX);
   looper_preset->color(FL_BACKGROUND_COLOR);
@@ -280,12 +287,13 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_preset->labelcolor(FL_BACKGROUND2_COLOR);
   looper_preset->textsize(10);
   looper_preset->textcolor(FL_BACKGROUND2_COLOR);
-  looper_preset->callback((Fl_Callback*)cb_looper_preset, (void*)(12030));
+  looper_preset->callback((Fl_Callback*)cb_looper_preset, (void*)(UD_PRESET_LOOPER));
   looper_preset->align(Fl_Align(FL_ALIGN_LEFT));
   looper_preset->when(FL_WHEN_RELEASE_ALWAYS);
   looper_preset->menu(menu_looper_preset);
+  preset_choice = o;
 } // RKR_Choice* looper_preset
-{ looper_WD = new RKR_Slider(53, 25, 100, 10, "Dry/Wet");
+{ looper_WD = new RKR_Slider(56, 25, 100, 10, "Dry/Wet");
   looper_WD->type(5);
   looper_WD->box(FL_FLAT_BOX);
   looper_WD->color((Fl_Color)178);
@@ -301,7 +309,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_WD->align(Fl_Align(FL_ALIGN_LEFT));
   looper_WD->when(FL_WHEN_CHANGED);
 } // RKR_Slider* looper_WD
-{ looper_level1 = new RKR_Slider(53, 37, 100, 10, "Level 1");
+{ looper_level1 = new RKR_Slider(56, 37, 100, 10, "Level 1");
   looper_level1->type(5);
   looper_level1->box(FL_FLAT_BOX);
   looper_level1->color((Fl_Color)178);
@@ -317,7 +325,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_level1->align(Fl_Align(FL_ALIGN_LEFT));
   looper_level1->when(FL_WHEN_RELEASE);
 } // RKR_Slider* looper_level1
-{ looper_level2 = new RKR_Slider(53, 49, 100, 10, "Level 2");
+{ looper_level2 = new RKR_Slider(56, 49, 100, 10, "Level 2");
   looper_level2->type(5);
   looper_level2->box(FL_FLAT_BOX);
   looper_level2->color((Fl_Color)178);
@@ -333,7 +341,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_level2->align(Fl_Align(FL_ALIGN_LEFT));
   looper_level2->when(FL_WHEN_RELEASE);
 } // RKR_Slider* looper_level2
-{ looper_Tempo = new RKR_Slider(53, 61, 100, 10, "Tempo");
+{ looper_Tempo = new RKR_Slider(56, 61, 100, 10, "Tempo");
   looper_Tempo->type(5);
   looper_Tempo->box(FL_FLAT_BOX);
   looper_Tempo->color((Fl_Color)178);
@@ -393,7 +401,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_rv->labelfont(0);
   looper_rv->labelsize(10);
   looper_rv->labelcolor(FL_BACKGROUND2_COLOR);
-  looper_rv->callback((Fl_Callback*)cb_looper_rv, (void*)(2));
+  looper_rv->callback((Fl_Callback*)cb_looper_rv);
   looper_rv->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   looper_rv->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* looper_rv
@@ -406,7 +414,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_ap->labelfont(0);
   looper_ap->labelsize(10);
   looper_ap->labelcolor(FL_BACKGROUND2_COLOR);
-  looper_ap->callback((Fl_Callback*)cb_looper_ap, (void*)(2));
+  looper_ap->callback((Fl_Callback*)cb_looper_ap);
   looper_ap->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   looper_ap->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* looper_ap
@@ -457,7 +465,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_play->labelfont(0);
   looper_play->labelsize(14);
   looper_play->labelcolor(FL_FOREGROUND_COLOR);
-  looper_play->callback((Fl_Callback*)cb_looper_play, (void*)(2));
+  looper_play->callback((Fl_Callback*)cb_looper_play);
   looper_play->align(Fl_Align(FL_ALIGN_CENTER));
   looper_play->when(FL_WHEN_RELEASE);
   o->set_label_offset(4);
@@ -473,7 +481,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_stop->labelfont(0);
   looper_stop->labelsize(14);
   looper_stop->labelcolor(FL_FOREGROUND_COLOR);
-  looper_stop->callback((Fl_Callback*)cb_looper_stop, (void*)(2));
+  looper_stop->callback((Fl_Callback*)cb_looper_stop);
   looper_stop->align(Fl_Align(FL_ALIGN_CENTER));
   looper_stop->when(FL_WHEN_RELEASE);
   o->set_label_offset(4);
@@ -487,7 +495,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_record->labelfont(0);
   looper_record->labelsize(14);
   looper_record->labelcolor((Fl_Color)1);
-  looper_record->callback((Fl_Callback*)cb_looper_record, (void*)(2));
+  looper_record->callback((Fl_Callback*)cb_looper_record);
   looper_record->align(Fl_Align(FL_ALIGN_CENTER));
   looper_record->when(FL_WHEN_RELEASE);
   o->set_label_offset(4);
@@ -514,7 +522,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_r1->labelfont(0);
   looper_r1->labelsize(10);
   looper_r1->labelcolor(FL_BACKGROUND2_COLOR);
-  looper_r1->callback((Fl_Callback*)cb_looper_r1, (void*)(2));
+  looper_r1->callback((Fl_Callback*)cb_looper_r1);
   looper_r1->align(Fl_Align(FL_ALIGN_TOP));
   looper_r1->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* looper_r1
@@ -528,7 +536,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_r2->labelfont(0);
   looper_r2->labelsize(10);
   looper_r2->labelcolor(FL_BACKGROUND2_COLOR);
-  looper_r2->callback((Fl_Callback*)cb_looper_r2, (void*)(2));
+  looper_r2->callback((Fl_Callback*)cb_looper_r2);
   looper_r2->align(Fl_Align(FL_ALIGN_TOP));
   looper_r2->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* looper_r2
@@ -542,7 +550,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_t1->labelfont(0);
   looper_t1->labelsize(10);
   looper_t1->labelcolor(FL_FOREGROUND_COLOR);
-  looper_t1->callback((Fl_Callback*)cb_looper_t1, (void*)(2));
+  looper_t1->callback((Fl_Callback*)cb_looper_t1);
   looper_t1->align(Fl_Align(FL_ALIGN_CENTER|FL_ALIGN_INSIDE));
   looper_t1->when(FL_WHEN_RELEASE);
 } // RKR_Button* looper_t1
@@ -556,7 +564,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_t2->labelfont(0);
   looper_t2->labelsize(10);
   looper_t2->labelcolor(FL_FOREGROUND_COLOR);
-  looper_t2->callback((Fl_Callback*)cb_looper_t2, (void*)(2));
+  looper_t2->callback((Fl_Callback*)cb_looper_t2);
   looper_t2->align(Fl_Align(FL_ALIGN_CENTER|FL_ALIGN_INSIDE));
   looper_t2->when(FL_WHEN_RELEASE);
 } // RKR_Button* looper_t2
@@ -570,7 +578,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_lnk->labelfont(0);
   looper_lnk->labelsize(10);
   looper_lnk->labelcolor(FL_BACKGROUND2_COLOR);
-  looper_lnk->callback((Fl_Callback*)cb_looper_lnk, (void*)(2));
+  looper_lnk->callback((Fl_Callback*)cb_looper_lnk);
   looper_lnk->align(Fl_Align(FL_ALIGN_LEFT));
   looper_lnk->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* looper_lnk
@@ -583,7 +591,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_clear->labelfont(0);
   looper_clear->labelsize(10);
   looper_clear->labelcolor(FL_FOREGROUND_COLOR);
-  looper_clear->callback((Fl_Callback*)cb_looper_clear, (void*)(2));
+  looper_clear->callback((Fl_Callback*)cb_looper_clear);
   looper_clear->align(Fl_Align(FL_ALIGN_CENTER));
   looper_clear->when(FL_WHEN_RELEASE);
 } // RKR_Button* looper_clear
@@ -597,7 +605,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   looper_mt->labelfont(0);
   looper_mt->labelsize(10);
   looper_mt->labelcolor(FL_BACKGROUND2_COLOR);
-  looper_mt->callback((Fl_Callback*)cb_looper_mt, (void*)(2));
+  looper_mt->callback((Fl_Callback*)cb_looper_mt);
   looper_mt->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   looper_mt->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* looper_mt
@@ -614,4 +622,69 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
 } // RKR_Box* L_TimePos
 position(X, Y);
 end();
+}
+
+void LooperGui::parameter_refresh(int index) {
+  switch(index)
+      {
+      case Looper_DryWet:
+          looper_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_DryWet)));
+          break;
+      case Looper_Level_1:
+          looper_level1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Level_1));
+          break;
+      case Looper_Level_2:
+          looper_level2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Level_2));
+          break;
+      case Looper_Reverse:
+          looper_rv->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Reverse));
+          break;
+      case Looper_AutoPlay:
+          looper_ap->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_AutoPlay));
+          break;
+      case Looper_Play:
+          looper_play->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Play));
+          m_parent->update_looper();
+          break;
+      case Looper_Stop:
+          looper_stop->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Stop));
+          m_parent->update_looper();
+          break;
+      case Looper_Record:
+          looper_record->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Record));
+          m_parent->update_looper();
+          break;
+      case Looper_Rec_1:
+          looper_r1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Rec_1));
+          break;
+      case Looper_Rec_2:
+          looper_r2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Rec_2));
+          break;
+      case Looper_Track_1:
+          looper_t1->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Track_1));
+          m_parent->update_looper();
+          break;
+      case Looper_Track_2:
+          looper_t2->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Track_2));
+          m_parent->update_looper();
+          break;
+      case Looper_Clear:
+          /* Setting the looper_clear button after MIDI control really does not work. 
+             The button for the gui is just press and release, i.e. not a toggle button.
+             Since the clear flag Pclear is set and remains set until another button such
+             as play or record gets pushed, the Pclear variable returned by getpar(4) is
+             going to show pressed (value = 1) and set the button as pressed here. And it
+             will remain in that state until restart. If pressed manually, it just does
+             unpress and release back to press.  Would be nice to show the press and release
+             with MIDI control, but it would probably have to be a timer issue and additional
+             complications for very little value. MIDI control does work, but we should not show
+             it on the gui button here with this method */
+      //    looper_clear->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Clear));
+          m_parent->update_looper();
+          break;
+      }
+}
+
+void LooperGui::tap_tempo_update() {
+  looper_Tempo->value(m_process->Rack_Effects[EFX_LOOPER]->getpar(Looper_Tempo));
 }

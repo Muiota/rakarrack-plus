@@ -3,18 +3,18 @@
 #include "har_gui.h"
 
 void HarGui::cb_har_activar_i(RKR_Light_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Harmonizer_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_HARMONIZER]);
  return;
 }
-rkr->Harmonizer_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_HARMONIZER]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_Har->cleanup();
-rkr->efx_Har->changepar(3,rkr->efx_Har->getpar(3));
-rgui->Chord(0);
-rgui->findpos(14,(int)o->value(),o);
+m_process->Rack_Effects[EFX_HARMONIZER]->cleanup();
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Interval,m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Interval));
+m_parent->Chord(0);
+m_parent->findpos(EFX_HARMONIZER,(int)o->value(),o);
 }
 void HarGui::cb_har_activar(RKR_Light_Button* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_activar_i(o,v);
@@ -22,19 +22,16 @@ void HarGui::cb_har_activar(RKR_Light_Button* o, void* v) {
 
 void HarGui::cb_har_preset_i(RKR_Choice* o, void* v) {
   long long ud= (long long) v;
-if((ud==0)||(ud==12014))rkr->efx_Har->setpreset((int)o->value());
-har_WD->value(Dry_Wet(rkr->efx_Har->getpar(0)));
-har_pan->value(rkr->efx_Har->getpar(1)-64);
-har_gan->value(rkr->efx_Har->getpar(2)-64);
-har_int->value(rkr->efx_Har->getpar(3)-12);
-har_SELECT->value(rkr->efx_Har->getpar(5));
-har_note->value(rkr->efx_Har->getpar(6));
-har_type->value(rkr->efx_Har->getpar(7));
-har_freq1->value(rkr->efx_Har->getpar(4));
-har_gan1->value(rkr->efx_Har->getpar(8)-64);
-har_q1->value(rkr->efx_Har->getpar(9)-64);
-har_MIDI->value(rkr->efx_Har->getpar(10));
-if ((rkr->efx_Har->PMIDI) || (rkr->efx_Har->PSELECT)) rgui->Chord(0);
+if((ud==0)||(ud==UD_PRESET_HARMONIZER))
+    m_process->Rack_Effects[EFX_HARMONIZER]->setpreset((int)o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_HARMONIZER]; i++)
+{
+    parameter_refresh(i);
+};
+
+Harmonizer *Efx_Harmonizer = static_cast <Harmonizer*> (m_process->Rack_Effects[EFX_HARMONIZER]);
+if ((Efx_Harmonizer->PMIDI) || (Efx_Harmonizer->PSELECT)) m_parent->Chord(0);
 }
 void HarGui::cb_har_preset(RKR_Choice* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_preset_i(o,v);
@@ -48,148 +45,152 @@ Fl_Menu_Item HarGui::menu_har_preset[] = {
 };
 
 void HarGui::cb_har_WD_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(31);
+ m_parent->getMIDIControl(MC_Harm_DryWet);
  return;
 } 
-rkr->efx_Har->changepar(0,Dry_Wet((int)(o->value())));
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_DryWet,Dry_Wet((int)(o->value())));
 }
 void HarGui::cb_har_WD(RKR_Slider* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_WD_i(o,v);
 }
 
 void HarGui::cb_har_int_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(27);
+ m_parent->getMIDIControl(MC_Harm_Interval);
  return;
 } 
-rkr->Harmonizer_Bypass=0;
-rkr->efx_Har->changepar(3,(int)(o->value()+12));
-if((int)har_activar->value())rkr->Harmonizer_Bypass=1;
+m_process->EFX_Active[EFX_HARMONIZER]=0;
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Interval,(int)(o->value()+12));
+if((int)har_activar->value())m_process->EFX_Active[EFX_HARMONIZER]=1;
 }
 void HarGui::cb_har_int(RKR_Slider* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_int_i(o,v);
 }
 
 void HarGui::cb_har_gan_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(412);
+ m_parent->getMIDIControl(MC_Harm_Gain);
  return;
 } 
-rkr->efx_Har->changepar(2,(int)(o->value()+64));
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Gain,(int)(o->value()+64));
 }
 void HarGui::cb_har_gan(RKR_Slider* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_gan_i(o,v);
 }
 
 void HarGui::cb_har_pan_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(49);
+ m_parent->getMIDIControl(MC_Harm_Pan);
  return;
 } 
-rkr->efx_Har->changepar(1,(int)(o->value()+64));
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Pan,(int)(o->value()+64));
 }
 void HarGui::cb_har_pan(RKR_Slider* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_pan_i(o,v);
 }
 
 void HarGui::cb_har_freq1_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(26);
+ m_parent->getMIDIControl(MC_Harm_Filter_Freq);
  return;
 } 
-rkr->efx_Har->changepar(4,(int)o->value());
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Filter_Freq,(int)o->value());
 }
 void HarGui::cb_har_freq1(RKR_Slider* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_freq1_i(o,v);
 }
 
 void HarGui::cb_har_gan1_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(413);
+ m_parent->getMIDIControl(MC_Harm_Filter_Gain);
  return;
 } 
-rkr->efx_Har->changepar(8,(int)(o->value()+64));
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Filter_Gain,(int)(o->value()+64));
 }
 void HarGui::cb_har_gan1(RKR_Slider* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_gan1_i(o,v);
 }
 
 void HarGui::cb_har_q1_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(414);
+ m_parent->getMIDIControl(MC_Harm_Filter_Q);
  return;
 } 
-rkr->efx_Har->changepar(9,(int)(o->value()+64));
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Filter_Q,(int)(o->value()+64));
 }
 void HarGui::cb_har_q1(RKR_Slider* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_q1_i(o,v);
 }
 
 void HarGui::cb_har_MIDI_i(RKR_Check_Button* o, void*) {
-  rkr->efx_Har->changepar(10,(int)o->value());
-rkr->RC_Harm->cleanup();
-if(!(int)o->value())rkr->efx_Har->changepar(3,rkr->efx_Har->getpar(3));
+  m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_MIDI,(int)o->value());
+m_process->RC_Harm->cleanup();
+if(!(int)o->value())m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Interval,m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Interval));
 }
 void HarGui::cb_har_MIDI(RKR_Check_Button* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_MIDI_i(o,v);
 }
 
 void HarGui::cb_har_SELECT_i(RKR_Check_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(447);
+ m_parent->getMIDIControl(MC_Harm_Select);
  return;
 }
-rkr->efx_Har->changepar(5,(int)o->value());
-rkr->RC_Harm->cleanup();
-if(!(int)o->value())rkr->efx_Har->changepar(3,rkr->efx_Har->getpar(3));
-rgui->Chord(0);
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Select,(int)o->value());
+m_process->RC_Harm->cleanup();
+if(!(int)o->value())m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Interval,m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Interval));
+m_parent->Chord(0);
 }
 void HarGui::cb_har_SELECT(RKR_Check_Button* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_SELECT_i(o,v);
 }
 
 void HarGui::cb_har_note_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(444);
+ m_parent->getMIDIControl(MC_Harm_Note);
  return;
 }
-rkr->efx_Har->changepar(6,(unsigned char)o->value());
-rgui->Chord(0);
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Note,(unsigned char)o->value());
+m_parent->Chord(0);
 }
 void HarGui::cb_har_note(RKR_Slider* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_note_i(o,v);
 }
 
 void HarGui::cb_har_type_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(445);
+ m_parent->getMIDIControl(MC_Harm_Chord);
  return;
 }
-rkr->efx_Har->changepar(7,(unsigned char)o->value());
-rgui->Chord(0);
+m_process->Rack_Effects[EFX_HARMONIZER]->changepar(Harm_Chord,(unsigned char)o->value());
+m_parent->Chord(0);
 }
 void HarGui::cb_har_type(RKR_Slider* o, void* v) {
   ((HarGui*)(o->parent()))->cb_har_type_i(o,v);
 }
 HarGui::HarGui(int X, int Y, int W, int H, const char *L)
-  : Fl_Group(0, 0, W, H, L) {
+  : RKR_Gui_Effect(0, 0, W, H, L) {
 this->box(FL_UP_BOX);
 this->color(FL_FOREGROUND_COLOR);
 this->selection_color(FL_FOREGROUND_COLOR);
-this->user_data((void*)(1));
+this->labeltype(FL_NO_LABEL);
+this->labelfont(0);
+this->labelsize(14);
+this->labelcolor(FL_FOREGROUND_COLOR);
 this->align(Fl_Align(96|FL_ALIGN_INSIDE));
-{ har_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
+this->when(FL_WHEN_RELEASE);
+{ RKR_Light_Button* o = har_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
   har_activar->box(FL_UP_BOX);
   har_activar->shortcut(0x30);
   har_activar->color((Fl_Color)62);
@@ -198,11 +199,12 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_activar->labelfont(0);
   har_activar->labelsize(10);
   har_activar->labelcolor(FL_FOREGROUND_COLOR);
-  har_activar->callback((Fl_Callback*)cb_har_activar, (void*)(2));
+  har_activar->callback((Fl_Callback*)cb_har_activar);
   har_activar->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   har_activar->when(FL_WHEN_CHANGED);
+  activate_effect = o;
 } // RKR_Light_Button* har_activar
-{ har_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
+{ RKR_Choice* o = har_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
   har_preset->box(FL_FLAT_BOX);
   har_preset->down_box(FL_BORDER_BOX);
   har_preset->color(FL_BACKGROUND_COLOR);
@@ -213,12 +215,13 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_preset->labelcolor(FL_BACKGROUND2_COLOR);
   har_preset->textsize(10);
   har_preset->textcolor(FL_BACKGROUND2_COLOR);
-  har_preset->callback((Fl_Callback*)cb_har_preset, (void*)(12014));
+  har_preset->callback((Fl_Callback*)cb_har_preset, (void*)(UD_PRESET_HARMONIZER));
   har_preset->align(Fl_Align(FL_ALIGN_LEFT));
   har_preset->when(FL_WHEN_RELEASE_ALWAYS);
   har_preset->menu(menu_har_preset);
+  preset_choice = o;
 } // RKR_Choice* har_preset
-{ har_WD = new RKR_Slider(53, 30, 100, 10, "Dry/Wet");
+{ har_WD = new RKR_Slider(56, 30, 100, 10, "Dry/Wet");
   har_WD->type(5);
   har_WD->box(FL_FLAT_BOX);
   har_WD->color((Fl_Color)178);
@@ -234,7 +237,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_WD->align(Fl_Align(FL_ALIGN_LEFT));
   har_WD->when(FL_WHEN_CHANGED);
 } // RKR_Slider* har_WD
-{ har_int = new RKR_Slider(53, 43, 100, 10, "Interval");
+{ har_int = new RKR_Slider(56, 43, 100, 10, "Interval");
   har_int->type(5);
   har_int->box(FL_FLAT_BOX);
   har_int->color((Fl_Color)178);
@@ -251,7 +254,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_int->align(Fl_Align(FL_ALIGN_LEFT));
   har_int->when(FL_WHEN_CHANGED);
 } // RKR_Slider* har_int
-{ har_gan = new RKR_Slider(53, 58, 100, 10, "Gain");
+{ har_gan = new RKR_Slider(56, 58, 100, 10, "Gain");
   har_gan->type(5);
   har_gan->box(FL_FLAT_BOX);
   har_gan->color((Fl_Color)178);
@@ -268,7 +271,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_gan->align(Fl_Align(FL_ALIGN_LEFT));
   har_gan->when(FL_WHEN_CHANGED);
 } // RKR_Slider* har_gan
-{ har_pan = new RKR_Slider(53, 71, 100, 10, "Pan");
+{ har_pan = new RKR_Slider(56, 71, 100, 10, "Pan");
   har_pan->type(5);
   har_pan->box(FL_FLAT_BOX);
   har_pan->color((Fl_Color)178);
@@ -285,7 +288,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_pan->align(Fl_Align(FL_ALIGN_LEFT));
   har_pan->when(FL_WHEN_CHANGED);
 } // RKR_Slider* har_pan
-{ har_freq1 = new RKR_Slider(52, 88, 100, 10, "Freq");
+{ har_freq1 = new RKR_Slider(56, 88, 100, 10, "Freq");
   har_freq1->type(5);
   har_freq1->box(FL_FLAT_BOX);
   har_freq1->color((Fl_Color)178);
@@ -303,7 +306,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_freq1->align(Fl_Align(FL_ALIGN_LEFT));
   har_freq1->when(FL_WHEN_CHANGED);
 } // RKR_Slider* har_freq1
-{ har_gan1 = new RKR_Slider(53, 100, 100, 10, "F. Gain");
+{ har_gan1 = new RKR_Slider(56, 100, 100, 10, "F. Gain");
   har_gan1->tooltip("Filter Gain");
   har_gan1->type(5);
   har_gan1->box(FL_FLAT_BOX);
@@ -321,7 +324,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_gan1->align(Fl_Align(FL_ALIGN_LEFT));
   har_gan1->when(FL_WHEN_CHANGED);
 } // RKR_Slider* har_gan1
-{ har_q1 = new RKR_Slider(53, 112, 100, 10, "Filter Q");
+{ har_q1 = new RKR_Slider(56, 112, 100, 10, "Filter Q");
   har_q1->type(5);
   har_q1->box(FL_FLAT_BOX);
   har_q1->color((Fl_Color)178);
@@ -347,7 +350,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_MIDI->labelfont(0);
   har_MIDI->labelsize(10);
   har_MIDI->labelcolor(FL_BACKGROUND2_COLOR);
-  har_MIDI->callback((Fl_Callback*)cb_har_MIDI, (void*)(2));
+  har_MIDI->callback((Fl_Callback*)cb_har_MIDI);
   har_MIDI->align(Fl_Align(FL_ALIGN_RIGHT));
   har_MIDI->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* har_MIDI
@@ -360,7 +363,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_SELECT->labelfont(0);
   har_SELECT->labelsize(10);
   har_SELECT->labelcolor(FL_BACKGROUND2_COLOR);
-  har_SELECT->callback((Fl_Callback*)cb_har_SELECT, (void*)(2));
+  har_SELECT->callback((Fl_Callback*)cb_har_SELECT);
   har_SELECT->align(Fl_Align(FL_ALIGN_RIGHT));
   har_SELECT->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* har_SELECT
@@ -376,7 +379,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_chordname->when(FL_WHEN_RELEASE);
   o->set_label_offset(2);
 } // RKR_Box* har_chordname
-{ har_note = new RKR_Slider(53, 158, 100, 10, "Note");
+{ har_note = new RKR_Slider(56, 158, 100, 10, "Note");
   har_note->type(5);
   har_note->box(FL_FLAT_BOX);
   har_note->color((Fl_Color)178);
@@ -392,7 +395,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   har_note->align(Fl_Align(FL_ALIGN_LEFT));
   har_note->when(FL_WHEN_CHANGED);
 } // RKR_Slider* har_note
-{ har_type = new RKR_Slider(53, 170, 100, 10, "Chord");
+{ har_type = new RKR_Slider(56, 170, 100, 10, "Chord");
   har_type->type(5);
   har_type->box(FL_FLAT_BOX);
   har_type->color((Fl_Color)178);
@@ -410,4 +413,45 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
 } // RKR_Slider* har_type
 position(X, Y);
 end();
+}
+
+void HarGui::parameter_refresh(int index) {
+  switch (index)
+      {
+      case Harm_DryWet:
+          har_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_DryWet)));
+          break;
+      case Harm_Pan:
+          har_pan->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Pan)-64);
+          break;
+      case Harm_Gain:
+          har_gan->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Gain)-64);
+          break;
+      case Harm_Interval:
+          har_int->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Interval)-12);
+          break;
+      case Harm_Filter_Freq:
+          har_freq1->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Filter_Freq));
+          break;
+      case Harm_Select:
+          har_SELECT->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Select));
+          break;
+      case Harm_Note:
+          har_note->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Note));
+          m_parent->Chord(0);
+          break;
+      case Harm_Chord:
+          har_type->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Chord));
+          m_parent->Chord(0);
+          break;
+      case Harm_Filter_Gain:
+          har_gan1->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Filter_Gain)-64);
+          break;
+      case Harm_Filter_Q:
+          har_q1->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_Filter_Q)-64);
+          break;
+      case Harm_MIDI:
+          har_MIDI->value(m_process->Rack_Effects[EFX_HARMONIZER]->getpar(Harm_MIDI));
+          break;
+      }
 }

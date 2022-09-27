@@ -15,8 +15,8 @@
 
 #include <math.h>
 #include "global.h"
-#include "AnalogFilter.h"
-#include "Sustainer.h"
+#include "EFX_common/AnalogFilter.h"
+#include "FX/Sustainer.h"
 
 class Recognize
 {
@@ -54,7 +54,7 @@ private:
 
     void displayFrequency (float freq);
     void schmittInit (int size, double sample_rate);
-    void schmittS16LE (signed short int *indata);
+    void schmittS16LE (const signed short int *indata);
     
     float fSAMPLE_RATE;
     double dSAMPLE_RATE;

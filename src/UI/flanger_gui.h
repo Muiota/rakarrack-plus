@@ -6,13 +6,13 @@
 #include "RKR_Light_Button.h"
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 #include "common_gui_menu.h"
 
-class FlangerGui : public Fl_Group {
+class FlangerGui : public RKR_Gui_Effect {
 public:
   FlangerGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *flanger_activar;
@@ -86,5 +86,8 @@ private:
   inline void cb_flanger_LR_i(RKR_Slider*, void*);
   static void cb_flanger_LR(RKR_Slider*, void*);
   CommonGuiMenu *m_lfo_menu; 
+public:
+  void parameter_refresh(int index);
+  void tap_tempo_update();
 };
 #endif

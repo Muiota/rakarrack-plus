@@ -6,13 +6,13 @@
 #include "RKR_Light_Button.h"
 #include "RKR_Choice.h"
 #include "RKR_Counter.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 #include "common_gui_menu.h"
 
-class ArpieGui : public Fl_Group {
+class ArpieGui : public RKR_Gui_Effect {
 public:
   ArpieGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *arpie_activar;
@@ -82,5 +82,8 @@ private:
   static void cb_arpie_pattern(RKR_Choice*, void*);
   static Fl_Menu_Item menu_arpie_pattern[];
   CommonGuiMenu *m_subdiv_menu; 
+public:
+  void parameter_refresh(int index);
+  void tap_tempo_update();
 };
 #endif

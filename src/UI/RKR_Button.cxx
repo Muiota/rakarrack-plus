@@ -28,20 +28,83 @@
 
 RKR_Button::RKR_Button(int X, int Y, int W, int H, const char *label) :
     Fl_Button(X, Y, W, H, label),
-    m_label_offset(0),      // default 10pt - (C_DEFAULT_FONT_SIZE)
+    m_label_offset(0),              // default 10pt - (C_DEFAULT_FONT_SIZE)
     m_start_width(W),
     m_start_height(H),
-    m_previous_font_size(global_font_size)
+    m_bank_highlight_preset(0),     // false
+    m_button_type(BUTTON_DEFAULT),
+    m_look_changed(0),
+    m_bank_under_mouse(0)
 {
-    this->user_data((void*)(BUTTON_USER_DATA));
+    this->user_data((void*)(UD_RKR_Highlight));
 }
 
 void RKR_Button::draw()
 {
-    /* To update the font size if user changes the value in settings */
-    if(global_font_size != m_previous_font_size)
+    // This must be done for bank window outside m_look_changed for preset selection
+    if(m_button_type == BUTTON_BANK_HIGHLIGHT)
     {
-        m_previous_font_size = global_font_size;
+        if(m_bank_highlight_preset)
+        {
+            if(m_bank_under_mouse)
+            {
+                color(global_leds_color);
+            }
+            else
+            {
+                color(fl_darker(global_leds_color));
+            }
+        }
+        else
+        {
+            if(m_bank_under_mouse)
+            {
+                color(fl_color_average(global_fore_color, fl_lighter(global_fore_color), .6));
+            }
+            else
+            {
+                color(global_fore_color);
+            }
+        }
+
+        labelcolor(global_label_color);
+    }
+    
+    if(m_look_changed != global_look_changed)
+    {
+        m_look_changed = global_look_changed;
+    
+        switch(m_button_type)
+        {
+            case BUTTON_DEFAULT:
+            {
+                color(global_fore_color);
+                labelcolor(global_label_color);
+                break;
+            }
+
+            case BUTTON_MIDI_GET:
+            {
+                labelcolor(global_label_color);
+                break;
+            }
+
+            case BUTTON_RKR_LABEL:
+            {
+                labelcolor(fl_darker(global_leds_color));
+                break;
+            }
+
+            case BUTTON_BANK_RESET:
+            {
+                color(fl_darker(FL_RED));
+                labelcolor(global_label_color);
+                break;
+            }
+        }
+
+        labelfont(global_font_type);
+        selection_color(global_leds_color);
         font_resize(w(), h());
     }
 

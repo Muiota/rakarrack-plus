@@ -7,12 +7,12 @@
 #include "RKR_Box.h"
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 
-class LooperGui : public Fl_Group {
+class LooperGui : public RKR_Gui_Effect {
 public:
   LooperGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *looper_activar;
@@ -122,5 +122,8 @@ public:
 private:
   CommonGuiMenu *m_looper_bar; 
   CommonGuiMenu *m_looper_ms; 
+public:
+  void parameter_refresh(int index);
+  void tap_tempo_update();
 };
 #endif

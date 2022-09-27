@@ -3,16 +3,16 @@
 #include "valve_gui.h"
 
 void ValveGui::cb_valve_activar_i(RKR_Light_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Valve_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_VALVE]);
  return;
 }
-rkr->Valve_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_VALVE]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_Valve->cleanup();
-rgui->findpos(19,(int)o->value(),o);
+m_process->Rack_Effects[EFX_VALVE]->cleanup();
+m_parent->findpos(EFX_VALVE,(int)o->value(),o);
 }
 void ValveGui::cb_valve_activar(RKR_Light_Button* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_activar_i(o,v);
@@ -20,20 +20,13 @@ void ValveGui::cb_valve_activar(RKR_Light_Button* o, void* v) {
 
 void ValveGui::cb_valve_preset_i(RKR_Choice* o, void* v) {
   long long ud= (long long) v;
-if((ud==0)||(ud==12019))rkr->efx_Valve->setpreset((int)o->value());
-valve_WD->value(Dry_Wet(rkr->efx_Valve->getpar(0)));
-valve_LRc->value(rkr->efx_Valve->getpar(2));
-valve_drive->value(rkr->efx_Valve->getpar(3));
-valve_level->value(rkr->efx_Valve->getpar(4));
-valve_neg->value(rkr->efx_Valve->getpar(5));
-valve_st->value(rkr->efx_Valve->getpar(8));
-valve_pan->value(rkr->efx_Valve->getpar(1)-64);
-valve_pf->value(rkr->efx_Valve->getpar(9));
-valve_lpf->value(rkr->efx_Valve->getpar(6));
-valve_hpf->value(rkr->efx_Valve->getpar(7));
-valve_Q->value(rkr->efx_Valve->getpar(10));
-valve_ed->value(rkr->efx_Valve->getpar(11));
-valve_Pre->value(rkr->efx_Valve->getpar(12));
+if((ud==0)||(ud==UD_PRESET_VALVE))
+    m_process->Rack_Effects[EFX_VALVE]->setpreset((int)o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_VALVE]; i++)
+{
+    parameter_refresh(i);
+};
 }
 void ValveGui::cb_valve_preset(RKR_Choice* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_preset_i(o,v);
@@ -48,148 +41,152 @@ Fl_Menu_Item ValveGui::menu_valve_preset[] = {
 };
 
 void ValveGui::cb_valve_WD_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(169);
+ m_parent->getMIDIControl(MC_Valve_DryWet);
  return;
 } 
-rkr->efx_Valve->changepar(0,Dry_Wet((int)(o->value())));
+m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_DryWet,Dry_Wet((int)(o->value())));
 }
 void ValveGui::cb_valve_WD(RKR_Slider* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_WD_i(o,v);
 }
 
 void ValveGui::cb_valve_LRc_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(170);
+ m_parent->getMIDIControl(MC_Valve_LR_Cross);
  return;
 } 
-rkr->efx_Valve->changepar(2,(int)(o->value()));
+m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_LR_Cross,(int)(o->value()));
 }
 void ValveGui::cb_valve_LRc(RKR_Slider* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_LRc_i(o,v);
 }
 
 void ValveGui::cb_valve_pan_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(171);
+ m_parent->getMIDIControl(MC_Valve_Pan);
  return;
 } 
-rkr->efx_Valve->changepar(1,(int)(o->value()+64));
+m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_Pan,(int)(o->value()+64));
 }
 void ValveGui::cb_valve_pan(RKR_Slider* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_pan_i(o,v);
 }
 
 void ValveGui::cb_valve_level_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(172);
+ m_parent->getMIDIControl(MC_Valve_Level);
  return;
 } 
-rkr->efx_Valve->changepar(4,(int)o->value());
+m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_Level,(int)o->value());
 }
 void ValveGui::cb_valve_level(RKR_Slider* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_level_i(o,v);
 }
 
 void ValveGui::cb_valve_drive_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(173);
+ m_parent->getMIDIControl(MC_Valve_Drive);
  return;
 } 
-rkr->efx_Valve->changepar(3,(int)o->value());
+m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_Drive,(int)o->value());
 }
 void ValveGui::cb_valve_drive(RKR_Slider* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_drive_i(o,v);
 }
 
 void ValveGui::cb_valve_ed_i(RKR_Check_Button* o, void*) {
-  rkr->efx_Valve->changepar(11,(int)o->value());
+  m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_Ex_Dist,(int)o->value());
 }
 void ValveGui::cb_valve_ed(RKR_Check_Button* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_ed_i(o,v);
 }
 
 void ValveGui::cb_valve_Q_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(174);
+ m_parent->getMIDIControl(MC_Valve_Distortion);
  return;
 } 
-rkr->efx_Valve->changepar(10,(int)o->value());
+m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_Distortion,(int)o->value());
 }
 void ValveGui::cb_valve_Q(RKR_Slider* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_Q_i(o,v);
 }
 
 void ValveGui::cb_valve_Pre_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(175);
+ m_parent->getMIDIControl(MC_Valve_Presence);
  return;
 } 
-rkr->efx_Valve->changepar(12,(int)o->value());
+m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_Presence,(int)o->value());
 }
 void ValveGui::cb_valve_Pre(RKR_Slider* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_Pre_i(o,v);
 }
 
 void ValveGui::cb_valve_pf_i(RKR_Check_Button* o, void*) {
-  rkr->efx_Valve->changepar(9,(int)o->value());
+  m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_Prefilter,(int)o->value());
 }
 void ValveGui::cb_valve_pf(RKR_Check_Button* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_pf_i(o,v);
 }
 
 void ValveGui::cb_valve_st_i(RKR_Check_Button* o, void*) {
-  rkr->efx_Valve->changepar(8,(int)o->value());
+  m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_Stereo,(int)o->value());
 }
 void ValveGui::cb_valve_st(RKR_Check_Button* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_st_i(o,v);
 }
 
 void ValveGui::cb_valve_neg_i(RKR_Check_Button* o, void*) {
-  rkr->efx_Valve->changepar(5,(int)o->value());
+  m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_Negate,(int)o->value());
 }
 void ValveGui::cb_valve_neg(RKR_Check_Button* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_neg_i(o,v);
 }
 
 void ValveGui::cb_valve_lpf_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(176);
+ m_parent->getMIDIControl(MC_Valve_LPF);
  return;
 } 
-rkr->efx_Valve->changepar(6,(int)o->value());
+m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_LPF,(int)o->value());
 }
 void ValveGui::cb_valve_lpf(RKR_Slider* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_lpf_i(o,v);
 }
 
 void ValveGui::cb_valve_hpf_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(177);
+ m_parent->getMIDIControl(MC_Valve_HPF);
  return;
 } 
-rkr->efx_Valve->changepar(7,(int)o->value());
+m_process->Rack_Effects[EFX_VALVE]->changepar(Valve_HPF,(int)o->value());
 }
 void ValveGui::cb_valve_hpf(RKR_Slider* o, void* v) {
   ((ValveGui*)(o->parent()))->cb_valve_hpf_i(o,v);
 }
 ValveGui::ValveGui(int X, int Y, int W, int H, const char *L)
-  : Fl_Group(0, 0, W, H, L) {
+  : RKR_Gui_Effect(0, 0, W, H, L) {
 this->box(FL_UP_BOX);
 this->color(FL_FOREGROUND_COLOR);
 this->selection_color(FL_FOREGROUND_COLOR);
-this->user_data((void*)(1));
+this->labeltype(FL_NO_LABEL);
+this->labelfont(0);
+this->labelsize(14);
+this->labelcolor(FL_FOREGROUND_COLOR);
 this->align(Fl_Align(96|FL_ALIGN_INSIDE));
-{ valve_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
+this->when(FL_WHEN_RELEASE);
+{ RKR_Light_Button* o = valve_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
   valve_activar->box(FL_UP_BOX);
   valve_activar->shortcut(0x33);
   valve_activar->color((Fl_Color)62);
@@ -198,11 +195,12 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   valve_activar->labelfont(0);
   valve_activar->labelsize(10);
   valve_activar->labelcolor(FL_FOREGROUND_COLOR);
-  valve_activar->callback((Fl_Callback*)cb_valve_activar, (void*)(2));
+  valve_activar->callback((Fl_Callback*)cb_valve_activar);
   valve_activar->align(Fl_Align(68|FL_ALIGN_INSIDE));
   valve_activar->when(FL_WHEN_CHANGED);
+  activate_effect = o;
 } // RKR_Light_Button* valve_activar
-{ valve_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
+{ RKR_Choice* o = valve_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
   valve_preset->box(FL_FLAT_BOX);
   valve_preset->down_box(FL_BORDER_BOX);
   valve_preset->color(FL_BACKGROUND_COLOR);
@@ -213,10 +211,11 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   valve_preset->labelcolor(FL_BACKGROUND2_COLOR);
   valve_preset->textsize(10);
   valve_preset->textcolor(FL_BACKGROUND2_COLOR);
-  valve_preset->callback((Fl_Callback*)cb_valve_preset, (void*)(12019));
+  valve_preset->callback((Fl_Callback*)cb_valve_preset, (void*)(UD_PRESET_VALVE));
   valve_preset->align(Fl_Align(FL_ALIGN_LEFT));
   valve_preset->when(FL_WHEN_RELEASE_ALWAYS);
   valve_preset->menu(menu_valve_preset);
+  preset_choice = o;
 } // RKR_Choice* valve_preset
 { valve_WD = new RKR_Slider(56, 31, 100, 10, "Dry/Wet");
   valve_WD->type(5);
@@ -308,7 +307,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   valve_ed->labelfont(0);
   valve_ed->labelsize(10);
   valve_ed->labelcolor(FL_BACKGROUND2_COLOR);
-  valve_ed->callback((Fl_Callback*)cb_valve_ed, (void*)(2));
+  valve_ed->callback((Fl_Callback*)cb_valve_ed);
   valve_ed->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   valve_ed->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* valve_ed
@@ -354,7 +353,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   valve_pf->labelfont(0);
   valve_pf->labelsize(10);
   valve_pf->labelcolor(FL_BACKGROUND2_COLOR);
-  valve_pf->callback((Fl_Callback*)cb_valve_pf, (void*)(2));
+  valve_pf->callback((Fl_Callback*)cb_valve_pf);
   valve_pf->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   valve_pf->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* valve_pf
@@ -367,7 +366,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   valve_st->labelfont(0);
   valve_st->labelsize(10);
   valve_st->labelcolor(FL_BACKGROUND2_COLOR);
-  valve_st->callback((Fl_Callback*)cb_valve_st, (void*)(2));
+  valve_st->callback((Fl_Callback*)cb_valve_st);
   valve_st->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   valve_st->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* valve_st
@@ -380,7 +379,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   valve_neg->labelfont(0);
   valve_neg->labelsize(10);
   valve_neg->labelcolor(FL_BACKGROUND2_COLOR);
-  valve_neg->callback((Fl_Callback*)cb_valve_neg, (void*)(2));
+  valve_neg->callback((Fl_Callback*)cb_valve_neg);
   valve_neg->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   valve_neg->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* valve_neg
@@ -422,4 +421,49 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
 } // RKR_Slider* valve_hpf
 position(X, Y);
 end();
+}
+
+void ValveGui::parameter_refresh(int index) {
+  switch (index)
+      {
+      case Valve_DryWet:
+          valve_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_DryWet)));
+          break;
+      case Valve_Pan:
+          valve_pan->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_Pan)-64);
+          break;
+      case Valve_LR_Cross:
+          valve_LRc->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_LR_Cross));
+          break;
+      case Valve_Drive:
+          valve_drive->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_Drive));
+          break;
+      case Valve_Level:
+          valve_level->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_Level));
+          break;
+      case Valve_Negate:
+          valve_neg->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_Negate));
+          break;
+      case Valve_LPF:
+          valve_lpf->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_LPF));
+          break;
+      case Valve_HPF:
+          valve_hpf->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_HPF));
+          break;
+      case Valve_Stereo:
+          valve_st->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_Stereo));
+          break;
+      case Valve_Prefilter:
+          valve_pf->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_Prefilter));
+          break;
+      case Valve_Distortion:
+          valve_Q->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_Distortion));
+          break;
+      case Valve_Ex_Dist:
+          valve_ed->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_Ex_Dist));
+          break;
+      case Valve_Presence:
+          valve_Pre->value(m_process->Rack_Effects[EFX_VALVE]->getpar(Valve_Presence));
+          break;
+      }
 }

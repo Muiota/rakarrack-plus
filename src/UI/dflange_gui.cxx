@@ -3,16 +3,16 @@
 #include "dflange_gui.h"
 
 void DflangeGui::cb_dflange_activar_i(RKR_Light_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->DFlange_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_DUAL_FLANGE]);
  return;
 }
-rkr->DFlange_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_DUAL_FLANGE]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_DFlange->cleanup();
-rgui->findpos(20,(int)o->value(),o);
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->cleanup();
+m_parent->findpos(EFX_DUAL_FLANGE,(int)o->value(),o);
 }
 void DflangeGui::cb_dflange_activar(RKR_Light_Button* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_activar_i(o,v);
@@ -20,22 +20,13 @@ void DflangeGui::cb_dflange_activar(RKR_Light_Button* o, void* v) {
 
 void DflangeGui::cb_dflange_preset_i(RKR_Choice* o, void* v) {
   long long ud= (long long) v;
-if((ud==0)||(ud==12020))rkr->efx_DFlange->setpreset((int)o->value());
-dflange_WD->value(Dry_Wet(rkr->efx_DFlange->getpar(0)));
-dflange_pan->value(rkr->efx_DFlange->getpar(1));
-dflange_freq->value(rkr->efx_DFlange->getpar(10));
-dflange_rnd->value(rkr->efx_DFlange->getpar(13));
-dflange_lfotype->value(rkr->efx_DFlange->getpar(12));
-dflange_stdf->value(rkr->efx_DFlange->getpar(11));
-dflange_width->value(rkr->efx_DFlange->getpar(4));
-dflange_depth->value(rkr->efx_DFlange->getpar(3));
-dflange_fb->value(rkr->efx_DFlange->getpar(6));
-dflange_LR->value(rkr->efx_DFlange->getpar(2));
-dflange_subs->value(rkr->efx_DFlange->getpar(8));
-dflange_tz->value(rkr->efx_DFlange->getpar(9));
-dflange_offset->value(rkr->efx_DFlange->getpar(5));
-dflange_lpf->value(rkr->efx_DFlange->getpar(7));
-dflange_intense->value(rkr->efx_DFlange->getpar(14));
+if((ud==0)||(ud==UD_PRESET_DUAL_FLANGE))
+    m_process->Rack_Effects[EFX_DUAL_FLANGE]->setpreset((int)o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_DUAL_FLANGE]; i++)
+{
+    parameter_refresh(i);
+};
 }
 void DflangeGui::cb_dflange_preset(RKR_Choice* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_preset_i(o,v);
@@ -54,178 +45,182 @@ Fl_Menu_Item DflangeGui::menu_dflange_preset[] = {
 };
 
 void DflangeGui::cb_dflange_WD_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(158);
+ m_parent->getMIDIControl(MC_DFlange_DryWet);
  return;
 } 
-rkr->efx_DFlange->changepar(0,Dry_Wet((int)(o->value())));
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_DryWet,Dry_Wet((int)(o->value())));
 }
 void DflangeGui::cb_dflange_WD(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_WD_i(o,v);
 }
 
 void DflangeGui::cb_dflange_pan_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(159);
+ m_parent->getMIDIControl(MC_DFlange_Pan);
  return;
 } 
-rkr->efx_DFlange->changepar(1,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_Pan,(int)o->value());
 }
 void DflangeGui::cb_dflange_pan(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_pan_i(o,v);
 }
 
 void DflangeGui::cb_dflange_LR_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(160);
+ m_parent->getMIDIControl(MC_DFlange_LR_Cross);
  return;
 } 
-rkr->efx_DFlange->changepar(2,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_LR_Cross,(int)o->value());
 }
 void DflangeGui::cb_dflange_LR(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_LR_i(o,v);
 }
 
 void DflangeGui::cb_dflange_depth_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(161);
+ m_parent->getMIDIControl(MC_DFlange_Depth);
  return;
 } 
-rkr->efx_DFlange->changepar(3,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_Depth,(int)o->value());
 }
 void DflangeGui::cb_dflange_depth(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_depth_i(o,v);
 }
 
 void DflangeGui::cb_dflange_width_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(162);
+ m_parent->getMIDIControl(MC_DFlange_Width);
  return;
 } 
-rkr->efx_DFlange->changepar(4,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_Width,(int)o->value());
 }
 void DflangeGui::cb_dflange_width(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_width_i(o,v);
 }
 
 void DflangeGui::cb_dflange_offset_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(163);
+ m_parent->getMIDIControl(MC_DFlange_Offset);
  return;
 } 
-rkr->efx_DFlange->changepar(5,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_Offset,(int)o->value());
 }
 void DflangeGui::cb_dflange_offset(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_offset_i(o,v);
 }
 
 void DflangeGui::cb_dflange_fb_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(164);
+ m_parent->getMIDIControl(MC_DFlange_Feedback);
  return;
 } 
-rkr->efx_DFlange->changepar(6,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_Feedback,(int)o->value());
 }
 void DflangeGui::cb_dflange_fb(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_fb_i(o,v);
 }
 
 void DflangeGui::cb_dflange_lpf_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(165);
+ m_parent->getMIDIControl(MC_DFlange_LPF);
  return;
 } 
-rkr->efx_DFlange->changepar(7,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_LPF,(int)o->value());
 }
 void DflangeGui::cb_dflange_lpf(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_lpf_i(o,v);
 }
 
 void DflangeGui::cb_dflange_subs_i(RKR_Check_Button* o, void*) {
-  rkr->efx_DFlange->changepar(8,(int)o->value());
+  m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_Subtract,(int)o->value());
 }
 void DflangeGui::cb_dflange_subs(RKR_Check_Button* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_subs_i(o,v);
 }
 
 void DflangeGui::cb_dflange_tz_i(RKR_Check_Button* o, void*) {
-  rkr->efx_DFlange->changepar(9,(int)o->value());
+  m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_Zero,(int)o->value());
 }
 void DflangeGui::cb_dflange_tz(RKR_Check_Button* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_tz_i(o,v);
 }
 
 void DflangeGui::cb_dflange_intense_i(RKR_Check_Button* o, void*) {
-  rkr->efx_DFlange->changepar(14,(int)o->value());
+  m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_Intense,(int)o->value());
 }
 void DflangeGui::cb_dflange_intense(RKR_Check_Button* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_intense_i(o,v);
 }
 
 void DflangeGui::cb_dflange_freq_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(166);
+ m_parent->getMIDIControl(MC_DFlange_LFO_Tempo);
  return;
 } 
-rkr->efx_DFlange->changepar(10,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_LFO_Tempo,(int)o->value());
 }
 void DflangeGui::cb_dflange_freq(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_freq_i(o,v);
 }
 
 void DflangeGui::cb_dflange_stdf_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(167);
+ m_parent->getMIDIControl(MC_DFlange_LFO_Stereo);
  return;
 } 
-rkr->efx_DFlange->changepar(11,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_LFO_Stereo,(int)o->value());
 }
 void DflangeGui::cb_dflange_stdf(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_stdf_i(o,v);
 }
 
 void DflangeGui::cb_dflange_lfotype_i(RKR_Choice* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(460);
+ m_parent->getMIDIControl(MC_DFlange_LFO_Type);
  return;
 } 
 
-rkr->efx_DFlange->changepar(12,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_LFO_Type,(int)o->value());
 }
 void DflangeGui::cb_dflange_lfotype(RKR_Choice* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_lfotype_i(o,v);
 }
 
 void DflangeGui::cb_dflange_rnd_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(168);
+ m_parent->getMIDIControl(MC_DFlange_LFO_Random);
  return;
 } 
-rkr->efx_DFlange->changepar(13,(int)o->value());
+m_process->Rack_Effects[EFX_DUAL_FLANGE]->changepar(DFlange_LFO_Random,(int)o->value());
 }
 void DflangeGui::cb_dflange_rnd(RKR_Slider* o, void* v) {
   ((DflangeGui*)(o->parent()))->cb_dflange_rnd_i(o,v);
 }
 DflangeGui::DflangeGui(int X, int Y, int W, int H, const char *L)
-  : Fl_Group(0, 0, W, H, L) {
+  : RKR_Gui_Effect(0, 0, W, H, L) {
 this->box(FL_UP_BOX);
 this->color(FL_FOREGROUND_COLOR);
 this->selection_color(FL_FOREGROUND_COLOR);
-this->user_data((void*)(1));
+this->labeltype(FL_NO_LABEL);
+this->labelfont(0);
+this->labelsize(14);
+this->labelcolor(FL_FOREGROUND_COLOR);
 this->align(Fl_Align(96|FL_ALIGN_INSIDE));
-{ dflange_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
+this->when(FL_WHEN_RELEASE);
+{ RKR_Light_Button* o = dflange_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
   dflange_activar->box(FL_UP_BOX);
   dflange_activar->shortcut(0x38);
   dflange_activar->color((Fl_Color)62);
@@ -234,11 +229,12 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   dflange_activar->labelfont(0);
   dflange_activar->labelsize(10);
   dflange_activar->labelcolor(FL_FOREGROUND_COLOR);
-  dflange_activar->callback((Fl_Callback*)cb_dflange_activar, (void*)(2));
+  dflange_activar->callback((Fl_Callback*)cb_dflange_activar);
   dflange_activar->align(Fl_Align(68|FL_ALIGN_INSIDE));
   dflange_activar->when(FL_WHEN_CHANGED);
+  activate_effect = o;
 } // RKR_Light_Button* dflange_activar
-{ dflange_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
+{ RKR_Choice* o = dflange_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
   dflange_preset->box(FL_FLAT_BOX);
   dflange_preset->down_box(FL_BORDER_BOX);
   dflange_preset->color(FL_BACKGROUND_COLOR);
@@ -249,10 +245,11 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   dflange_preset->labelcolor(FL_BACKGROUND2_COLOR);
   dflange_preset->textsize(10);
   dflange_preset->textcolor(FL_BACKGROUND2_COLOR);
-  dflange_preset->callback((Fl_Callback*)cb_dflange_preset, (void*)(12020));
+  dflange_preset->callback((Fl_Callback*)cb_dflange_preset, (void*)(UD_PRESET_DUAL_FLANGE));
   dflange_preset->align(Fl_Align(FL_ALIGN_LEFT));
   dflange_preset->when(FL_WHEN_RELEASE_ALWAYS);
   dflange_preset->menu(menu_dflange_preset);
+  preset_choice = o;
 } // RKR_Choice* dflange_preset
 { dflange_WD = new RKR_Slider(56, 24, 100, 10, "Dry/Wet");
   dflange_WD->type(5);
@@ -397,7 +394,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   dflange_subs->labelfont(0);
   dflange_subs->labelsize(10);
   dflange_subs->labelcolor(FL_BACKGROUND2_COLOR);
-  dflange_subs->callback((Fl_Callback*)cb_dflange_subs, (void*)(2));
+  dflange_subs->callback((Fl_Callback*)cb_dflange_subs);
   dflange_subs->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   dflange_subs->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* dflange_subs
@@ -410,7 +407,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   dflange_tz->labelfont(0);
   dflange_tz->labelsize(10);
   dflange_tz->labelcolor(FL_BACKGROUND2_COLOR);
-  dflange_tz->callback((Fl_Callback*)cb_dflange_tz, (void*)(2));
+  dflange_tz->callback((Fl_Callback*)cb_dflange_tz);
   dflange_tz->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   dflange_tz->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* dflange_tz
@@ -423,7 +420,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   dflange_intense->labelfont(0);
   dflange_intense->labelsize(10);
   dflange_intense->labelcolor(FL_BACKGROUND2_COLOR);
-  dflange_intense->callback((Fl_Callback*)cb_dflange_intense, (void*)(2));
+  dflange_intense->callback((Fl_Callback*)cb_dflange_intense);
   dflange_intense->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   dflange_intense->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* dflange_intense
@@ -495,4 +492,59 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
 } // RKR_Slider* dflange_rnd
 position(X, Y);
 end();
+}
+
+void DflangeGui::parameter_refresh(int index) {
+  switch (index)
+      {
+      case DFlange_DryWet:
+          dflange_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_DryWet)));
+          break;
+      case DFlange_Pan:
+          dflange_pan->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_Pan));
+          break;
+      case DFlange_LR_Cross:
+          dflange_LR->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_LR_Cross));
+          break;
+      case DFlange_Depth:
+          dflange_depth->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_Depth));
+          break;
+      case DFlange_Width:
+          dflange_width->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_Width));
+          break;
+      case DFlange_Offset:
+          dflange_offset->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_Offset));
+          break;
+      case DFlange_Feedback:
+          dflange_fb->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_Feedback));
+          break;
+      case DFlange_LPF:
+          dflange_lpf->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_LPF));
+          break;
+      case DFlange_Subtract:
+          dflange_subs->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_Subtract));
+          break;
+      case DFlange_Zero:
+          dflange_tz->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_Zero));
+          break;
+      case DFlange_LFO_Tempo:
+          dflange_freq->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_LFO_Tempo));
+          break;
+      case DFlange_LFO_Stereo:
+          dflange_stdf->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_LFO_Stereo));
+          break;
+      case DFlange_LFO_Type:
+          dflange_lfotype->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_LFO_Type));
+          break;
+      case DFlange_LFO_Random:
+          dflange_rnd->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_LFO_Random));
+          break;
+      case DFlange_Intense:
+          dflange_intense->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_Intense));
+          break;
+      }
+}
+
+void DflangeGui::tap_tempo_update() {
+  dflange_freq->value(m_process->Rack_Effects[EFX_DUAL_FLANGE]->getpar(DFlange_LFO_Tempo));
 }

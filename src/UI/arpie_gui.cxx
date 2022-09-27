@@ -3,16 +3,16 @@
 #include "arpie_gui.h"
 
 void ArpieGui::cb_arpie_activar_i(RKR_Light_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Arpie_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_ARPIE]);
  return;
 }
-rkr->Arpie_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_ARPIE]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_Arpie->cleanup();
-rgui->findpos(24,(int)o->value(),o);
+m_process->Rack_Effects[EFX_ARPIE]->cleanup();
+m_parent->findpos(EFX_ARPIE,(int)o->value(),o);
 }
 void ArpieGui::cb_arpie_activar(RKR_Light_Button* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_activar_i(o,v);
@@ -20,18 +20,13 @@ void ArpieGui::cb_arpie_activar(RKR_Light_Button* o, void* v) {
 
 void ArpieGui::cb_arpie_preset_i(RKR_Choice* o, void* v) {
   long long ud= (long long) v;
-if((ud==0)||(ud==12024))rkr->efx_Arpie->setpreset((int) o->value());
-arpie_WD->value(Dry_Wet(rkr->efx_Arpie->getpar(0)));
-arpie_pan->value(rkr->efx_Arpie->getpar(1)-64);
-arpie_delay->value(rkr->efx_Arpie->getpar(2));
-arpie_LRdl->value(rkr->efx_Arpie->getpar(3));
-arpie_LRc->value(rkr->efx_Arpie->getpar(4));
-arpie_fb->value(rkr->efx_Arpie->getpar(5));
-arpie_damp->value(rkr->efx_Arpie->getpar(6));
-arpie_arpe->value(rkr->efx_Arpie->getpar(7));
-arpie_harm->value(rkr->efx_Arpie->getpar(8));
-arpie_pattern->value(rkr->efx_Arpie->getpar(9));
-arpie_subdiv->value(rkr->efx_Arpie->getpar(10));
+if((ud==0)||(ud==UD_PRESET_ARPIE))
+    m_process->Rack_Effects[EFX_ARPIE]->setpreset((int) o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_ARPIE]; i++)
+{
+    parameter_refresh(i);
+};
 }
 void ArpieGui::cb_arpie_preset(RKR_Choice* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_preset_i(o,v);
@@ -52,117 +47,117 @@ Fl_Menu_Item ArpieGui::menu_arpie_preset[] = {
 };
 
 void ArpieGui::cb_arpie_WD_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(212);
+ m_parent->getMIDIControl(MC_Arpie_DryWet);
  return;
 } 
-rkr->efx_Arpie->changepar(0,Dry_Wet((int)(o->value())));
+m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_DryWet,Dry_Wet((int)(o->value())));
 }
 void ArpieGui::cb_arpie_WD(RKR_Slider* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_WD_i(o,v);
 }
 
 void ArpieGui::cb_arpie_arpe_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(213);
+ m_parent->getMIDIControl(MC_Arpie_ArpeWD);
  return;
 } 
-rkr->efx_Arpie->changepar(7,(int)o->value());
+m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_ArpeWD,(int)o->value());
 }
 void ArpieGui::cb_arpie_arpe(RKR_Slider* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_arpe_i(o,v);
 }
 
 void ArpieGui::cb_arpie_pan_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(214);
+ m_parent->getMIDIControl(MC_Arpie_Pan);
  return;
 } 
-rkr->efx_Arpie->changepar(1,(int)(o->value()+64));
+m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_Pan,(int)(o->value()+64));
 }
 void ArpieGui::cb_arpie_pan(RKR_Slider* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_pan_i(o,v);
 }
 
 void ArpieGui::cb_arpie_delay_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(215);
+ m_parent->getMIDIControl(MC_Arpie_Tempo);
  return;
 } 
-rkr->efx_Arpie->changepar(2,(int)o->value());
+m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_Tempo,(int)o->value());
 }
 void ArpieGui::cb_arpie_delay(RKR_Slider* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_delay_i(o,v);
 }
 
 void ArpieGui::cb_arpie_subdiv_i(RKR_Choice* o, void*) {
-  rkr->efx_Arpie->changepar(10,(int)o->value());
+  m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_Subdivision,(int)o->value());
 }
 void ArpieGui::cb_arpie_subdiv(RKR_Choice* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_subdiv_i(o,v);
 }
 
 void ArpieGui::cb_arpie_LRdl_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(216);
+ m_parent->getMIDIControl(MC_Arpie_LR_Delay);
  return;
 } 
-rkr->efx_Arpie->changepar(3,(int)o->value());
+m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_LR_Delay,(int)o->value());
 }
 void ArpieGui::cb_arpie_LRdl(RKR_Slider* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_LRdl_i(o,v);
 }
 
 void ArpieGui::cb_arpie_LRc_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(217);
+ m_parent->getMIDIControl(MC_Arpie_LR_Cross);
  return;
 } 
-rkr->efx_Arpie->changepar(4,(int)(o->value()));
+m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_LR_Cross,(int)(o->value()));
 }
 void ArpieGui::cb_arpie_LRc(RKR_Slider* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_LRc_i(o,v);
 }
 
 void ArpieGui::cb_arpie_fb_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(218);
+ m_parent->getMIDIControl(MC_Arpie_Feedback);
  return;
 } 
-rkr->efx_Arpie->changepar(5,(int)o->value());
+m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_Feedback,(int)o->value());
 }
 void ArpieGui::cb_arpie_fb(RKR_Slider* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_fb_i(o,v);
 }
 
 void ArpieGui::cb_arpie_damp_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(219);
+ m_parent->getMIDIControl(MC_Arpie_Damp);
  return;
 } 
-rkr->efx_Arpie->changepar(6,(int)o->value());
+m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_Damp,(int)o->value());
 }
 void ArpieGui::cb_arpie_damp(RKR_Slider* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_damp_i(o,v);
 }
 
 void ArpieGui::cb_arpie_harm_i(RKR_Counter* o, void*) {
-  rkr->efx_Arpie->changepar(8,(int)o->value());
+  m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_Harm,(int)o->value());
 }
 void ArpieGui::cb_arpie_harm(RKR_Counter* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_harm_i(o,v);
 }
 
 void ArpieGui::cb_arpie_pattern_i(RKR_Choice* o, void*) {
-  rkr->efx_Arpie->changepar(9,(int)o->value());
+  m_process->Rack_Effects[EFX_ARPIE]->changepar(Arpie_Pattern,(int)o->value());
 }
 void ArpieGui::cb_arpie_pattern(RKR_Choice* o, void* v) {
   ((ArpieGui*)(o->parent()))->cb_arpie_pattern_i(o,v);
@@ -178,13 +173,17 @@ Fl_Menu_Item ArpieGui::menu_arpie_pattern[] = {
  {0,0,0,0,0,0,0,0,0}
 };
 ArpieGui::ArpieGui(int X, int Y, int W, int H, const char *L)
-  : Fl_Group(0, 0, W, H, L) {
+  : RKR_Gui_Effect(0, 0, W, H, L) {
 this->box(FL_UP_BOX);
 this->color(FL_FOREGROUND_COLOR);
 this->selection_color(FL_FOREGROUND_COLOR);
-this->user_data((void*)(1));
+this->labeltype(FL_NO_LABEL);
+this->labelfont(0);
+this->labelsize(14);
+this->labelcolor(FL_FOREGROUND_COLOR);
 this->align(Fl_Align(96|FL_ALIGN_INSIDE));
-{ arpie_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
+this->when(FL_WHEN_RELEASE);
+{ RKR_Light_Button* o = arpie_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
   arpie_activar->box(FL_UP_BOX);
   arpie_activar->shortcut(0x35);
   arpie_activar->color((Fl_Color)62);
@@ -193,11 +192,12 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   arpie_activar->labelfont(0);
   arpie_activar->labelsize(10);
   arpie_activar->labelcolor(FL_FOREGROUND_COLOR);
-  arpie_activar->callback((Fl_Callback*)cb_arpie_activar, (void*)(2));
+  arpie_activar->callback((Fl_Callback*)cb_arpie_activar);
   arpie_activar->align(Fl_Align(68|FL_ALIGN_INSIDE));
   arpie_activar->when(FL_WHEN_CHANGED);
+  activate_effect = o;
 } // RKR_Light_Button* arpie_activar
-{ arpie_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
+{ RKR_Choice* o = arpie_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
   arpie_preset->box(FL_FLAT_BOX);
   arpie_preset->down_box(FL_BORDER_BOX);
   arpie_preset->color(FL_BACKGROUND_COLOR);
@@ -208,10 +208,11 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   arpie_preset->labelcolor(FL_BACKGROUND2_COLOR);
   arpie_preset->textsize(10);
   arpie_preset->textcolor(FL_BACKGROUND2_COLOR);
-  arpie_preset->callback((Fl_Callback*)cb_arpie_preset, (void*)(12024));
+  arpie_preset->callback((Fl_Callback*)cb_arpie_preset, (void*)(UD_PRESET_ARPIE));
   arpie_preset->align(Fl_Align(FL_ALIGN_LEFT));
   arpie_preset->when(FL_WHEN_RELEASE_ALWAYS);
   arpie_preset->menu(menu_arpie_preset);
+  preset_choice = o;
 } // RKR_Choice* arpie_preset
 { arpie_WD = new RKR_Slider(56, 28, 100, 10, "Dry/Wet");
   arpie_WD->type(5);
@@ -291,7 +292,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   arpie_subdiv->labelcolor(FL_BACKGROUND2_COLOR);
   arpie_subdiv->textsize(10);
   arpie_subdiv->textcolor(FL_BACKGROUND2_COLOR);
-  arpie_subdiv->callback((Fl_Callback*)cb_arpie_subdiv, (void*)(12));
+  arpie_subdiv->callback((Fl_Callback*)cb_arpie_subdiv);
   arpie_subdiv->align(Fl_Align(FL_ALIGN_LEFT));
   arpie_subdiv->when(FL_WHEN_RELEASE_ALWAYS);
   o->menu(m_subdiv_menu->get_subdiv_type());
@@ -391,11 +392,54 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   arpie_pattern->labelcolor(FL_BACKGROUND2_COLOR);
   arpie_pattern->textsize(10);
   arpie_pattern->textcolor(FL_BACKGROUND2_COLOR);
-  arpie_pattern->callback((Fl_Callback*)cb_arpie_pattern, (void*)(12));
+  arpie_pattern->callback((Fl_Callback*)cb_arpie_pattern);
   arpie_pattern->align(Fl_Align(FL_ALIGN_LEFT));
   arpie_pattern->when(FL_WHEN_RELEASE_ALWAYS);
   arpie_pattern->menu(menu_arpie_pattern);
 } // RKR_Choice* arpie_pattern
 position(X, Y);
 end();
+}
+
+void ArpieGui::parameter_refresh(int index) {
+  switch (index)
+      {
+      case Arpie_DryWet:
+          arpie_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_DryWet)));
+          break;
+      case Arpie_Pan:
+          arpie_pan->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_Pan)-64);
+          break;
+      case Arpie_Tempo:
+          arpie_delay->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_Tempo));
+          break;
+      case Arpie_LR_Delay:
+          arpie_LRdl->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_LR_Delay));
+          break;
+      case Arpie_LR_Cross:
+          arpie_LRc->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_LR_Cross));
+          break;
+      case Arpie_Feedback:
+          arpie_fb->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_Feedback));
+          break;
+      case Arpie_Damp:
+          arpie_damp->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_Damp));
+          break;
+      case Arpie_ArpeWD:
+          arpie_arpe->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_ArpeWD));
+          break;
+      case Arpie_Harm:
+          arpie_harm->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_Harm));
+          break;
+      case Arpie_Pattern:
+          arpie_pattern->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_Pattern));
+          break;
+      case Arpie_Subdivision:
+          arpie_subdiv->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_Subdivision));
+          break;
+      }
+}
+
+void ArpieGui::tap_tempo_update() {
+  arpie_delay->value(m_process->Rack_Effects[EFX_ARPIE]->getpar(Arpie_Tempo));
 }

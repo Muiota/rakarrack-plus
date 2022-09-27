@@ -24,28 +24,22 @@
 Scope::Scope(int x, int y, int w, int h, const char *label) : Fl_Box(x, y, w, h, label)
 {
     Scope_ON = false;
-    back = NULL;
-    leds_color = 0;
-    back_color = 0;
 }
 
-void Scope::init(float *smpsl, float *smpsr, int PERIOD)
+void Scope::init(float *smpsl, float *smpsr, int PERIOD, RKRGUI *_rgui)
 {
     spl = smpsl;
     spr = smpsr;
     ns = PERIOD;
+    m_parent = _rgui;
 }
 
 void Scope::draw()
 {
     int ox = x(), oy = y(), lx = w(), ly = h();
-    int i;
     int Xl, Xr, Yl, Yr;
     int SW, SH;
-    int px, py, old_px, old_py, oldr_px, oldr_py;
-    int posx;
     double pP = (double) ns;
-    double value = 0.0;
 
     SW = lx / 2 - 5;
     SH = ly;
@@ -67,25 +61,25 @@ void Scope::draw()
         //Draw Curve Reponse  
         back->draw(ox, oy);
 
-        fl_color(leds_color);
+        fl_color(global_leds_color);
 
 
-        old_px = Xl;
-        old_py = Yl;
-        oldr_px = Xr;
-        oldr_py = Yr;
+        int old_px = Xl;
+        int old_py = Yl;
+        int oldr_px = Xr;
+        int oldr_py = Yr;
 
-        for (i = 0; i < ns; i++)
+        for (int i = 0; i < ns; i++)
         {
-            posx = (int) ((double) i * coeff);
+            int posx = (int) ((double) i * coeff);
 
-            value = spl[i];
+            double value = spl[i];
             if (value > 1.0) value = 1.0;
             if (value<-1.0) value = -1.0;
 
 
-            px = Xl + posx;
-            py = Yl + lrint(value * .5 * SH);
+            int px = Xl + posx;
+            int py = Yl + lrint(value * .5 * SH);
 
             // printf("%d %d %d\n",i,px,py);
 
@@ -112,7 +106,7 @@ void Scope::draw()
     }
     else
     {
-        draw_box(box(), ox, oy, lx, ly, back_color);
+        draw_box(box(), ox, oy, lx, ly, global_back_color);
         draw_label();
     }
 }
@@ -128,8 +122,8 @@ int Scope::handle(int event)
             if (Scope_ON)
             {
                 Scope_ON = false;
-                rgui->Tuner->show();
-                rgui->Tuner->redraw();
+                m_parent->Tuner->show();
+                m_parent->Tuner->redraw();
             }
             return (1);
             break;

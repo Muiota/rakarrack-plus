@@ -30,9 +30,10 @@ RKR_Slider::RKR_Slider(int X, int Y, int W, int H, const char *label) :
     m_text_offset(0),       // C_DEFAULT_FONT_SIZE
     m_start_width(W),
     m_start_height(H),
-    m_previous_font_size(global_font_size),
+    m_look_changed(0),
     m_use_pixel_adjustment(true)    // main window efx sliders use this
 {
+    this->user_data((void*)(UD_RKR_Highlight));
 }
 
 int RKR_Slider::handle(int event)
@@ -44,17 +45,16 @@ int RKR_Slider::handle(int event)
     }
 
     int sxx = x(), syy = y(), sww = w(), shh = h();
-    int bww = w(), bhh = h();
-    
+
     if (horizontal())
     {
-        bww = w() * .30;        // value box width (magic number % of total width)
+        int bww = w() * .30;        // value box width (magic number % of total width)
         sxx += bww;             // adjust slider x location based on above box width
         sww -= bww;             // reduce slider width by box width
     }
     else
     {
-        bhh = h() * .18;        // value box height (magic number % of total height)
+        int bhh = h() * .18;        // value box height (magic number % of total height)
         syy += bhh;             // adjust slider y location based on above box height
         shh -= bhh;             // reduce slider height by box height
     }
@@ -214,10 +214,13 @@ int RKR_Slider::handle2(int event, int X, int Y, int W, int H)
 
 void RKR_Slider::draw()
 {
-    /* To update the font size if user changes the value in settings */
-    if(global_font_size != m_previous_font_size)
+    if(m_look_changed != global_look_changed)
     {
-        m_previous_font_size = global_font_size;
+        m_look_changed = global_look_changed;
+
+        labelfont(global_font_type);
+        textfont(global_font_type);
+        textcolor(global_label_color);
         font_resize(w(), h());
     }
 
@@ -239,7 +242,7 @@ void RKR_Slider::draw()
         shh -= bhh;             // reduce slider height by box height
     }
 
-    //  if (damage()&FL_DAMAGE_ALL) draw_box(box(),sxx,syy,sww,shh,back_color);
+    //  if (damage()&FL_DAMAGE_ALL) draw_box(box(),sxx,syy,sww,shh,global_back_color);
 
     X = sxx + Fl::box_dx(box());
     Y = syy + Fl::box_dy(box());
@@ -263,9 +266,6 @@ void RKR_Slider::draw()
     int xx, S;
 
     S = int(.25 * ww + .5) + 1;
-    int T = (horizontal() ? H : W) / 2 + 1;
-    T += 12;
-
 
     xx = int(val * (ww - S) + .5);
 
@@ -307,11 +307,11 @@ void RKR_Slider::draw()
     /*
    
      if (type() == FL_VERT_NICE_SLIDER) {
-       draw_box(FL_THIN_DOWN_BOX, X+W/2-2, ysl, 3,Y+H-ysl , fl_darker(leds_color));
+       draw_box(FL_THIN_DOWN_BOX, X+W/2-2, ysl, 3,Y+H-ysl , fl_darker(global_leds_color));
       }
       else
       {
-        draw_box(FL_THIN_DOWN_BOX, X, Y+H/2-2,xsl-X,3, fl_darker(leds_color));
+        draw_box(FL_THIN_DOWN_BOX, X, Y+H/2-2,xsl-X,3, fl_darker(global_leds_color));
       }  
     
      */
@@ -320,8 +320,8 @@ void RKR_Slider::draw()
     Fl_Color juan, pepe, luis;
     float vval = fabsf((float) val);
 
-    juan = fl_color_average(fl_darker(fl_darker(leds_color)), fl_lighter(fl_lighter(leds_color)), vval);
-    pepe = fl_color_average(fl_lighter(fl_lighter(leds_color)), fl_darker(fl_darker(leds_color)), vval);
+    juan = fl_color_average(fl_darker(fl_darker(global_leds_color)), fl_lighter(fl_lighter(global_leds_color)), vval);
+    pepe = fl_color_average(fl_lighter(fl_lighter(global_leds_color)), fl_darker(fl_darker(global_leds_color)), vval);
 
     Fl_Boxtype box1 = slider();
 
@@ -334,26 +334,26 @@ void RKR_Slider::draw()
     if (type() == FL_VERT_NICE_SLIDER)
     {
 
-        draw_box(box1, xsl, ysl, wsl, hsl, fore_color);
+        draw_box(box1, xsl, ysl, wsl, hsl, global_fore_color);
         int d = (hsl - 6) / 2;
 
         draw_box(FL_THIN_DOWN_BOX, xsl + 2, ysl + d, wsl - 4, hsl - 2 * d, juan);
     }
     else if (type() == FL_HOR_NICE_SLIDER)
     {
-        draw_box(box1, xsl, ysl, wsl, hsl, fore_color);
+        draw_box(box1, xsl, ysl, wsl, hsl, global_fore_color);
         int d = (wsl - 6) / 2;
         draw_box(FL_THIN_DOWN_BOX, xsl + d, ysl + 2, wsl - 2 * d, hsl - 4, pepe);
     }
 
 
-    labelcolor(label_color);
+    labelcolor(global_label_color);
     draw_label(xsl, ysl, wsl, hsl);
 
     if (Fl::focus() == this)
     {
         draw_focus(box1, xsl, ysl, wsl, hsl);
-        luis = leds_color;
+        luis = global_leds_color;
     }
     else luis = textcolor();
 
@@ -389,7 +389,7 @@ void RKR_Slider::draw()
     
     if ((Fl::scheme_) && (strcmp(Fl::scheme_, "plastic") == 0))
     {
-        fl_color(active_r() ? leds_color : fl_inactive(textcolor()));
+        fl_color(active_r() ? global_leds_color : fl_inactive(textcolor()));
     }
     else
     {

@@ -36,106 +36,56 @@
 #include<string.h>
 #include<unistd.h>
 
-#include"EQ.h"
-#include"Compressor.h"
-#include"Distorsion.h"
-#include"Echo.h"
-#include"Chorus.h"
-#include"APhaser.h"
-#include"Harmonizer.h"
+#include"FX/Effect.h"
+#include"FX/EQ.h"
+#include"FX/Compressor.h"
+#include"Limiter.h"
+#include"FX/Distorsion.h"
+#include"FX/Overdrive.h"
+#include"FX/Echo.h"
+#include"FX/Chorus.h"
+#include"FX/Flanger.h"
+#include"FX/APhaser.h"
+#include"FX/Harmonizer.h"
 #include"RecChord.h"
 #include"RecognizeNote.h"
-#include"Exciter.h"
-#include"Pan.h"
-#include"Alienwah.h"
-#include"Reverb.h"
-#include"Cabinet.h"
-#include"MusicDelay.h"
-#include"WahWah.h"
-#include"Derelict.h"
-#include"Valve.h"
-#include"Dual_Flange.h"
-#include"Ring.h"
-#include"DistBand.h"
-#include"Arpie.h"
-#include"Expander.h"
-#include"Shuffle.h"
-#include"Synthfilter.h"
-#include"VaryBand.h"
-#include"MuTroMojo.h"
-#include"Echoverse.h"
-#include"CoilCrafter.h"
-#include"ShelfBoost.h"
-#include"Vocoder.h"
-#include"Sequence.h"
-#include"Shifter.h"
-#include"StompBox.h"
-#include"Reverbtron.h"
-#include"Echotron.h"
-#include"StereoHarm.h"
-#include"CompBand.h"
-#include"Opticaltrem.h"
-#include"Vibe.h"
-#include"Infinity.h"
-#include"Phaser.h"
-#include"Gate.h"
-#include"MIDIConverter.h"
-#include"Convolotron.h"
-
-#undef OLDRKRLV2    // comment this for original method
-//#define OLDRKRLV2  // use this for original
-
-#define EQLV2_URI "https://github.com/Stazed/rakarrack-plus#eql"
-#define COMPLV2_URI "https://github.com/Stazed/rakarrack-plus#comp"
-#define DISTLV2_URI "https://github.com/Stazed/rakarrack-plus#dist"
-#define ECHOLV2_URI "https://github.com/Stazed/rakarrack-plus#eco"
-#define CHORUSLV2_URI "https://github.com/Stazed/rakarrack-plus#chor"
-#define APHASELV2_URI "https://github.com/Stazed/rakarrack-plus#aphas"
-#define PANLV2_URI "https://github.com/Stazed/rakarrack-plus#pan"
-#define ALIENLV2_URI "https://github.com/Stazed/rakarrack-plus#awha"
-#define HARMNOMIDLV2_URI "https://github.com/Stazed/rakarrack-plus#har_no_mid"
-#define EXCITERLV2_URI "https://github.com/Stazed/rakarrack-plus#Exciter"
-#define REVELV2_URI "https://github.com/Stazed/rakarrack-plus#reve"
-#define EQPLV2_URI "https://github.com/Stazed/rakarrack-plus#eqp"
-#define CABLV2_URI "https://github.com/Stazed/rakarrack-plus#cabe"
-#define MDELLV2_URI "https://github.com/Stazed/rakarrack-plus#delm"
-#define WAHLV2_URI "https://github.com/Stazed/rakarrack-plus#wha"
-#define DERELV2_URI "https://github.com/Stazed/rakarrack-plus#dere"
-#define VALVELV2_URI "https://github.com/Stazed/rakarrack-plus#Valve"
-#define DFLANGELV2_URI "https://github.com/Stazed/rakarrack-plus#Dual_Flange"
-#define RINGLV2_URI "https://github.com/Stazed/rakarrack-plus#Ring"
-#define DISTBANDLV2_URI "https://github.com/Stazed/rakarrack-plus#DistBand"
-#define ARPIELV2_URI "https://github.com/Stazed/rakarrack-plus#Arpie"
-#define EXPANDLV2_URI "https://github.com/Stazed/rakarrack-plus#Expander"
-#define SHUFFLELV2_URI "https://github.com/Stazed/rakarrack-plus#Shuffle"
-#define SYNTHLV2_URI "https://github.com/Stazed/rakarrack-plus#Synthfilter"
-#define VARYBANDLV2_URI "https://github.com/Stazed/rakarrack-plus#VaryBand"
-#define MUTROLV2_URI "https://github.com/Stazed/rakarrack-plus#MuTroMojo"
-#define ECHOVERSELV2_URI "https://github.com/Stazed/rakarrack-plus#Echoverse"
-#define COILLV2_URI "https://github.com/Stazed/rakarrack-plus#CoilCrafter"
-#define SHELFLV2_URI "https://github.com/Stazed/rakarrack-plus#ShelfBoost"
-#define VOCODERLV2_URI "https://github.com/Stazed/rakarrack-plus#Vocoder"
-#define SUSTAINLV2_URI "https://github.com/Stazed/rakarrack-plus#Sustainer"
-#define SEQUENCELV2_URI "https://github.com/Stazed/rakarrack-plus#Sequence"
-#define SHIFTERLV2_URI "https://github.com/Stazed/rakarrack-plus#Shifter"
-#define STOMPLV2_URI "https://github.com/Stazed/rakarrack-plus#StompBox"
-#define REVTRONLV2_URI "https://github.com/Stazed/rakarrack-plus#Reverbtron"
-#define ECHOTRONLV2_URI "https://github.com/Stazed/rakarrack-plus#Echotron"
-#define SHARMNOMIDLV2_URI "https://github.com/Stazed/rakarrack-plus#StereoHarm_no_mid"
-#define HARMLV2_URI "https://github.com/Stazed/rakarrack-plus#har"
-#define MBCOMPLV2_URI "https://github.com/Stazed/rakarrack-plus#CompBand"
-#define OPTTREMLV2_URI "https://github.com/Stazed/rakarrack-plus#Otrem"
-#define VIBELV2_URI "https://github.com/Stazed/rakarrack-plus#Vibe"
-#define INFLV2_URI "https://github.com/Stazed/rakarrack-plus#Infinity"
-#define PHASELV2_URI "https://github.com/Stazed/rakarrack-plus#phas"
-#define GATELV2_URI "https://github.com/Stazed/rakarrack-plus#gate"
-#define MIDICLV2_URI "https://github.com/Stazed/rakarrack-plus#midi_converter"
-#define CONVOLOTRONLV2_URI "https://github.com/Stazed/rakarrack-plus#Convolotron"
-#define FLANGELV2_URI "https://github.com/Stazed/rakarrack-plus#Flange"
-#define OVERDRIVELV2_URI "https://github.com/Stazed/rakarrack-plus#Overdrive"
-#define HARMLV2_URI "https://github.com/Stazed/rakarrack-plus#har"
-#define STEROHARMLV2_URI "https://github.com/Stazed/rakarrack-plus#StereoHarm"
-
+#include"FX/Exciter.h"
+#include"FX/Pan.h"
+#include"FX/Alienwah.h"
+#include"FX/Reverb.h"
+#include"FX/Cabinet.h"
+#include"FX/MusicDelay.h"
+#include"FX/WahWah.h"
+#include"FX/Derelict.h"
+#include"FX/Valve.h"
+#include"FX/Dual_Flange.h"
+#include"FX/Ring.h"
+#include"FX/DistBand.h"
+#include"FX/Arpie.h"
+#include"FX/Expander.h"
+#include"FX/Shuffle.h"
+#include"FX/Synthfilter.h"
+#include"FX/VaryBand.h"
+#include"FX/MuTroMojo.h"
+#include"FX/Echoverse.h"
+#include"FX/CoilCrafter.h"
+#include"FX/ShelfBoost.h"
+#include"FX/Vocoder.h"
+#include"FX/Sequence.h"
+#include"FX/Shifter.h"
+#include"FX/StompBox.h"
+#include"FX/Reverbtron.h"
+#include"FX/Echotron.h"
+#include"FX/StereoHarm.h"
+#include"FX/CompBand.h"
+#include"FX/Opticaltrem.h"
+#include"FX/Vibe.h"
+#include"FX/Infinity.h"
+#include"FX/Phaser.h"
+#include"FX/Gate.h"
+#include"FX/MIDIConverter.h"
+#include"FX/Convolotron.h"
+#include"FX/ParametricEQ.h"
 
 #define RVBFILE_URI "https://github.com/Stazed/rakarrack-plus#Reverbtron:rvbfile"
 #define DLYFILE_URI "https://github.com/Stazed/rakarrack-plus#Echotron:dlyfile"
@@ -145,7 +95,7 @@ class MIDIConverter;    // forward declaration
 
 enum RKRLV2_ports_
 {
-    INL =0,
+    INL = 0,
     INR,
     OUTL,
     OUTR,
@@ -177,55 +127,55 @@ enum RKRLV2_ports_
 //just make sure these line up with the order in manifest.ttl
 enum RKRLV2_effects_
 {
-	IEQ =0,
-	ICOMP,
-	IDIST,
-	IECHO,
-	ICHORUS,
-	IAPHASE,
-	IHARM_NM,
-	IEXCITER,
-	IPAN,
-	IAWAH,
-	IREV,//10
-	IEQP,
-	ICAB,
-	IMDEL,
-	IWAH,
-	IDERE,
-	IVALVE,
-	IDFLANGE,
-	IRING,
-	IDISTBAND,
-	IARPIE,//20
-	IEXPAND,
-	ISHUFF,
-	ISYNTH,
-	IVBAND,
-	IMUTRO,
-	IECHOVERSE,
-	ICOIL,
-	ISHELF,
-	IVOC,
-	ISUS,//30
-	ISEQ,
-	ISHIFT,
-	ISTOMP,
-	IREVTRON,
-	IECHOTRON,
-	ISHARM_NM,
-	IMBCOMP,
-	IOPTTREM,
-	IVIBE,
-	IINF,//40
-	IPHASE,
-	IGATE,
-	IMIDIC,
-        ICONVO,
-        IFLANGE,
-        IOVERDRIVE,
-        IHARM,
-        ISTEREOHARM
+    IEQ = 0,
+    ICOMP,
+    IDIST,
+    IECHO,
+    ICHORUS,
+    IAPHASE,
+    IHARM_NM,
+    IEXCITER,
+    IPAN,
+    IAWAH,
+    IREV,//10
+    IEQP,
+    ICAB,
+    IMDEL,
+    IWAH,
+    IDERE,
+    IVALVE,
+    IDFLANGE,
+    IRING,
+    IDISTBAND,
+    IARPIE,//20
+    IEXPAND,
+    ISHUFF,
+    ISYNTH,
+    IVBAND,
+    IMUTRO,
+    IECHOVERSE,
+    ICOIL,
+    ISHELF,
+    IVOC,
+    ISUS,//30
+    ISEQ,
+    ISHIFT,
+    ISTOMP,
+    IREVTRON,
+    IECHOTRON,
+    ISHARM_NM,
+    IMBCOMP,
+    IOPTTREM,
+    IVIBE,
+    IINF,//40
+    IPHASE,
+    IGATE,
+    IMIDIC,
+    ICONVO,
+    IFLANGE,
+    IOVERDRIVE,
+    IHARM,
+    ISTEREOHARM
 };
 
 typedef struct _RKRLV2
@@ -238,11 +188,7 @@ typedef struct _RKRLV2
     uint8_t prev_bypass;
     float	*tmp_l;//temporary buffers for wet/dry mixing for hosts with shared in/out buffers(Ardour)
     float 	*tmp_r;
-    
-#ifdef OLDRKRLV2
-    RvbFile* rvbfile;//file for reverbtron
-    DlyFile* dlyfile;//file for echotron
-#endif
+
     //ports
     float *input_l_p;
     float *input_r_p;
@@ -271,16 +217,32 @@ typedef struct _RKRLV2
         LV2_URID    bufsz_max;
         LV2_URID    patch_Set;
         LV2_URID    patch_Get;
-        LV2_URID	patch_property;
-        LV2_URID 	patch_value;
-        LV2_URID 	filetype_rvb;
-        LV2_URID 	filetype_dly;
-        LV2_URID        filetype_snd;
+        LV2_URID    patch_property;
+        LV2_URID    patch_value;
+        LV2_URID    filetype_rvb;
+        LV2_URID    filetype_dly;
+        LV2_URID    filetype_snd;
+        
+        urids():
+            midi_MidiEvent(),
+            atom_Float(),
+            atom_Int(),
+            atom_Object(),
+            atom_Path(),
+            atom_URID(),
+            bufsz_max(),
+            patch_Set(),
+            patch_Get(),
+            patch_property(),
+            patch_value(),
+            filetype_rvb(),
+            filetype_dly(),
+            filetype_snd() {}
 
     } URIDs;
 
     //effect modules
-    EQ* eq;             //0, 11
+    EQ* eq;             //0
     Compressor* comp;   //1
     Distorsion* dist;   //2
     Echo* echo;         //3
@@ -293,6 +255,7 @@ typedef struct _RKRLV2
     Pan* pan;			//8
     Alienwah* alien;    //9
     Reverb* reve;       //10
+    ParametricEQ* peq;  //11
     Cabinet* cab;       //12
     MusicDelay* mdel; 	//13
     WahWah* wah; //14
@@ -326,8 +289,8 @@ typedef struct _RKRLV2
     Gate* gate;         //43
     MIDIConverter* midic; //44
     Convolotron* convol;  //45
-    Chorus* flanger;     //46
-    Distorsion* overdrive;   //47
+    Flanger* flanger;     //46
+    Overdrive* overdrive;   //47
 
     
 } RKRLV2;

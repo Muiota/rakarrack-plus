@@ -1,5 +1,5 @@
 # data file for the Fltk User Interface Designer (fluid)
-version 1.0305
+version 1.0304
 header_name {.h}
 code_name {.cxx}
 decl {\#include "RKR_Light_Button.h"} {public global
@@ -8,46 +8,46 @@ decl {\#include "RKR_Light_Button.h"} {public global
 decl {\#include "RKR_Choice.h"} {public global
 }
 
-widget_class {\#include "common_gui_menu.h"} EchoverseGui {
-  user_data 1 open
+decl {\#include "RKR_GUI_Effect.h"} {public global
+}
+
+widget_class {\#include "common_gui_menu.h"} EchoverseGui {open selected
   xywh {1550 57 155 180} type Double box UP_BOX color 0 selection_color 0 align 112
   code0 {\#include "RKR_Slider.h"}
   code1 {\#include "../process.h"}
   code2 {\#include "rakarrack.h"}
-  code3 {\#include "common_gui_menu.h"} visible position_relative
+  code3 {\#include "common_gui_menu.h"}
+  class RKR_Gui_Effect visible position_relative
 } {
   Fl_Light_Button echoverse_activar {
     label On
-    user_data 2
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->Echoverse_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_ECHOVERSE]);
  return;
 }
-rkr->Echoverse_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_ECHOVERSE]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_Echoverse->cleanup();
-rgui->findpos(32,(int)o->value(),o);}
+m_process->Rack_Effects[EFX_ECHOVERSE]->cleanup();
+m_parent->findpos(EFX_ECHOVERSE,(int)o->value(),o);}
     xywh {5 4 34 18} shortcut 0x35 color 62 selection_color 1 labelsize 10 align 84 when 1
+    code0 {activate_effect = o;}
     class RKR_Light_Button
   }
   Fl_Choice echoverse_preset {
     label Preset
-    user_data 12032
+    user_data UD_PRESET_ECHOVERSE
     callback {long long ud= (long long) v;
-if((ud==0)||(ud==12032))rkr->efx_Echoverse->setpreset((int) o->value());
-echoverse_WD->value(Dry_Wet(rkr->efx_Echoverse->getpar(0)));
-echoverse_pan->value(rkr->efx_Echoverse->getpar(1)-64);
-echoverse_delay->value(rkr->efx_Echoverse->getpar(2));
-echoverse_LRdl->value(rkr->efx_Echoverse->getpar(3));
-echoverse_angle->value(rkr->efx_Echoverse->getpar(4)-64);
-echoverse_fb->value(rkr->efx_Echoverse->getpar(5));
-echoverse_damp->value(rkr->efx_Echoverse->getpar(6));
-echoverse_RV->value(rkr->efx_Echoverse->getpar(7));
-echoverse_subdiv->value(rkr->efx_Echoverse->getpar(8));
-echoverse_es->value(rkr->efx_Echoverse->getpar(9));}
+if((ud==0)||(ud==UD_PRESET_ECHOVERSE))
+    m_process->Rack_Effects[EFX_ECHOVERSE]->setpreset((int) o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_ECHOVERSE]; i++)
+{
+    parameter_refresh(i);
+};}
     xywh {77 4 76 18} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
+    code0 {preset_choice = o;}
     class RKR_Choice
   } {
     MenuItem {} {
@@ -69,110 +69,150 @@ echoverse_es->value(rkr->efx_Echoverse->getpar(9));}
   }
   Fl_Value_Slider echoverse_WD {
     label {Dry/Wet}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(303);
+ m_parent->getMIDIControl(MC_Echoverse_DryWet);
  return;
 }
-rkr->efx_Echoverse->changepar(0,Dry_Wet((int)(o->value())));}
+m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_DryWet,Dry_Wet((int)(o->value())));}
     xywh {56 27 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider echoverse_RV {
     label Reverse
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(304);
+ m_parent->getMIDIControl(MC_Echoverse_Reverse);
  return;
 }
-rkr->efx_Echoverse->changepar(7,(int)o->value());}
+m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_Reverse,(int)o->value());}
     xywh {56 41 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider echoverse_pan {
     label Pan
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(305);
+ m_parent->getMIDIControl(MC_Echoverse_Pan);
  return;
 }
-rkr->efx_Echoverse->changepar(1,(int)(o->value()+64));}
+m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_Pan,(int)(o->value()+64));}
     xywh {56 55 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 63 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider echoverse_delay {
     label Tempo
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(306);
+ m_parent->getMIDIControl(MC_Echoverse_Tempo);
  return;
 }
-rkr->efx_Echoverse->changepar(2,(int)o->value());}
+m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_Tempo,(int)o->value());}
     xywh {56 69 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 minimum 1 maximum 600 step 1 value 20 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider echoverse_LRdl {
     label {L/R Delay}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(307);
+ m_parent->getMIDIControl(MC_Echoverse_LR_Delay);
  return;
 }
-rkr->efx_Echoverse->changepar(3,(int)o->value());}
+m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_LR_Delay,(int)o->value());}
     xywh {56 83 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 when 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider echoverse_fb {
     label Feedback
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(308);
+ m_parent->getMIDIControl(MC_Echoverse_Feedback);
  return;
 }
-rkr->efx_Echoverse->changepar(5,(int)o->value());}
+m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_Feedback,(int)o->value());}
     xywh {56 97 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Choice echoverse_subdiv {
     label SubDivision
-    callback {rkr->efx_Echoverse->changepar(8,(int)o->value());} open selected
+    callback {m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_Subdivision,(int)o->value());} open
     xywh {77 111 76 18} down_box BORDER_BOX selection_color 0 labelsize 10 labelcolor 7 when 6 textsize 10 textcolor 7
     code0 {o->menu(m_subdiv_menu->get_subdiv_type());}
     class RKR_Choice
   } {}
   Fl_Value_Slider echoverse_damp {
     label Damp
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(309);
+ m_parent->getMIDIControl(MC_Echoverse_Damp);
  return;
 }
-rkr->efx_Echoverse->changepar(6,(int)o->value());}
+m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_Damp,(int)o->value());}
     xywh {56 134 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider echoverse_es {
     label {Ex Stereo}
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(310);
+ m_parent->getMIDIControl(MC_Echoverse_Ext_Stereo);
  return;
 }
-rkr->efx_Echoverse->changepar(9,(int)o->value());}
+m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_Ext_Stereo,(int)o->value());}
     tooltip {Extra Stereo} xywh {56 148 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 maximum 127 step 1 textcolor 7
     class RKR_Slider
   }
   Fl_Value_Slider echoverse_angle {
     label Angle
-    callback {if(Fl::event_button()==3)
+    callback {if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(311);
+ m_parent->getMIDIControl(MC_Echoverse_Angle);
  return;
 }
-rkr->efx_Echoverse->changepar(4,(int)(o->value()+64));}
+m_process->Rack_Effects[EFX_ECHOVERSE]->changepar(Echoverse_Angle,(int)(o->value()+64));}
     xywh {56 162 100 10} type {Horz Knob} box FLAT_BOX color 178 selection_color 62 labelsize 10 labelcolor 7 align 4 minimum -64 maximum 64 step 1 textcolor 7
     class RKR_Slider
   }
   decl {CommonGuiMenu *m_subdiv_menu;} {private local
+  }
+  Function {parameter_refresh(int index)} {return_type void
+  } {
+    code {switch (index)
+    {
+    case Echoverse_DryWet:
+        echoverse_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_DryWet)));
+        break;
+    case Echoverse_Pan:
+        echoverse_pan->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_Pan)-64);
+        break;
+    case Echoverse_Tempo:
+        echoverse_delay->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_Tempo));
+        break;
+    case Echoverse_LR_Delay:
+        echoverse_LRdl->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_LR_Delay));
+        break;
+    case Echoverse_Angle:
+        echoverse_angle->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_Angle)-64);
+        break;
+    case Echoverse_Feedback:
+        echoverse_fb->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_Feedback));
+        break;
+    case Echoverse_Damp:
+        echoverse_damp->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_Damp));
+        break;
+    case Echoverse_Reverse:
+        echoverse_RV->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_Reverse));
+        break;
+    case Echoverse_Subdivision:
+        echoverse_subdiv->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_Subdivision));
+        break;
+    case Echoverse_Ext_Stereo:
+        echoverse_es->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_Ext_Stereo));
+        break;
+    }} {}
+  }
+  Function {tap_tempo_update()} {return_type void
+  } {
+    code {echoverse_delay->value(m_process->Rack_Effects[EFX_ECHOVERSE]->getpar(Echoverse_Tempo));} {}
   }
 }

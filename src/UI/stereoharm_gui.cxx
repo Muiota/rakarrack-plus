@@ -3,19 +3,19 @@
 #include "stereoharm_gui.h"
 
 void SharGui::cb_shar_activar_i(RKR_Light_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(116);
- o->value(rkr->StereoHarm_Bypass);
+ m_parent->getMIDIControl(MC_Multi_On_Off);
+ o->value(m_process->EFX_Active[EFX_STEREOHARM]);
  return;
 }
-rkr->StereoHarm_Bypass=(int)o->value();
+m_process->EFX_Active[EFX_STEREOHARM]=(int)o->value();
 if((int) o->value()==0)
-rkr->efx_StereoHarm->cleanup();
-rkr->efx_StereoHarm->changepar(3,rkr->efx_StereoHarm->getpar(3));
-rkr->efx_StereoHarm->changepar(6,rkr->efx_StereoHarm->getpar(6));
-rgui->Chord(1);
-rgui->findpos(42,(int)o->value(),o);
+m_process->Rack_Effects[EFX_STEREOHARM]->cleanup();
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_L_Chroma,m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_L_Chroma));
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_R_Chroma,m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_R_Chroma));
+m_parent->Chord(1);
+m_parent->findpos(EFX_STEREOHARM,(int)o->value(),o);
 }
 void SharGui::cb_shar_activar(RKR_Light_Button* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_activar_i(o,v);
@@ -23,20 +23,17 @@ void SharGui::cb_shar_activar(RKR_Light_Button* o, void* v) {
 
 void SharGui::cb_shar_preset_i(RKR_Choice* o, void* v) {
   long long ud= (long long) v;
-if((ud==0)||(ud==12042))rkr->efx_StereoHarm->setpreset((int)o->value());
-shar_WD->value(Dry_Wet(rkr->efx_StereoHarm->getpar(0)));
-shar_ganl->value(rkr->efx_StereoHarm->getpar(1)-64);
-shar_intl->value(rkr->efx_StereoHarm->getpar(2)-12);
-shar_chl->value(rkr->efx_StereoHarm->getpar(3));
-shar_ganr->value(rkr->efx_StereoHarm->getpar(4)-64);
-shar_intr->value(rkr->efx_StereoHarm->getpar(5)-12);
-shar_chr->value(rkr->efx_StereoHarm->getpar(6));
-shar_lrc->value(rkr->efx_StereoHarm->getpar(11));
-shar_SELECT->value(rkr->efx_StereoHarm->getpar(7));
-shar_note->value(rkr->efx_StereoHarm->getpar(8));
-shar_type->value(rkr->efx_StereoHarm->getpar(9));
-shar_MIDI->value(rkr->efx_StereoHarm->getpar(10));
-if ((rkr->efx_StereoHarm->PMIDI) || (rkr->efx_StereoHarm->PSELECT)) rgui->Chord(1);
+if((ud==0)||(ud==UD_PRESET_STEREOHARM))
+    m_process->Rack_Effects[EFX_STEREOHARM]->setpreset((int)o->value());
+
+for (int i = 0; i < m_process->EFX_Param_Size[EFX_STEREOHARM]; i++)
+{
+    parameter_refresh(i);
+};
+
+
+StereoHarm *Efx_StereoHarm = static_cast<StereoHarm*>(m_process->Rack_Effects[EFX_STEREOHARM]);
+if ((Efx_StereoHarm->PMIDI) || (Efx_StereoHarm->PSELECT)) m_parent->Chord(1);
 }
 void SharGui::cb_shar_preset(RKR_Choice* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_preset_i(o,v);
@@ -51,113 +48,113 @@ Fl_Menu_Item SharGui::menu_shar_preset[] = {
 };
 
 void SharGui::cb_shar_WD_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(358);
+ m_parent->getMIDIControl(MC_Sharm_DryWet);
  return;
 }
-rkr->efx_StereoHarm->changepar(0,Dry_Wet((int)(o->value())));
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_DryWet,Dry_Wet((int)(o->value())));
 }
 void SharGui::cb_shar_WD(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_WD_i(o,v);
 }
 
 void SharGui::cb_shar_intl_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(359);
+ m_parent->getMIDIControl(MC_Sharm_L_Interval);
  return;
 }
-rkr->StereoHarm_Bypass=0;
-rkr->efx_StereoHarm->changepar(2,(int)(o->value()+12));
-if((int)shar_activar->value())rkr->StereoHarm_Bypass=1;
+m_process->EFX_Active[EFX_STEREOHARM]=0;
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_L_Interval,(int)(o->value()+12));
+if((int)shar_activar->value())m_process->EFX_Active[EFX_STEREOHARM]=1;
 }
 void SharGui::cb_shar_intl(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_intl_i(o,v);
 }
 
 void SharGui::cb_shar_chl_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(360);
+ m_parent->getMIDIControl(MC_Sharm_L_Chroma);
  return;
 }
-rkr->efx_StereoHarm->changepar(3,(int)o->value());
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_L_Chroma,(int)o->value());
 }
 void SharGui::cb_shar_chl(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_chl_i(o,v);
 }
 
 void SharGui::cb_shar_ganl_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(361);
+ m_parent->getMIDIControl(MC_Sharm_L_Gain);
  return;
 }
-rkr->efx_StereoHarm->changepar(1,(int)(o->value()+64));
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_L_Gain,(int)(o->value()+64));
 }
 void SharGui::cb_shar_ganl(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_ganl_i(o,v);
 }
 
 void SharGui::cb_shar_intr_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(362);
+ m_parent->getMIDIControl(MC_Sharm_R_Interval);
  return;
 }
-rkr->StereoHarm_Bypass=0;
-rkr->efx_StereoHarm->changepar(5,(int)(o->value()+12));
-if((int)shar_activar->value())rkr->StereoHarm_Bypass=1;
+m_process->EFX_Active[EFX_STEREOHARM]=0;
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_R_Interval,(int)(o->value()+12));
+if((int)shar_activar->value())m_process->EFX_Active[EFX_STEREOHARM]=1;
 }
 void SharGui::cb_shar_intr(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_intr_i(o,v);
 }
 
 void SharGui::cb_shar_chr_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(363);
+ m_parent->getMIDIControl(MC_Sharm_R_Chroma);
  return;
 }
-rkr->efx_StereoHarm->changepar(6,(int)o->value());
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_R_Chroma,(int)o->value());
 }
 void SharGui::cb_shar_chr(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_chr_i(o,v);
 }
 
 void SharGui::cb_shar_ganr_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(364);
+ m_parent->getMIDIControl(MC_Sharm_R_Gain);
  return;
 }
-rkr->efx_StereoHarm->changepar(4,(int)(o->value()+64));
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_R_Gain,(int)(o->value()+64));
 }
 void SharGui::cb_shar_ganr(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_ganr_i(o,v);
 }
 
 void SharGui::cb_shar_lrc_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(365);
+ m_parent->getMIDIControl(MC_Sharm_LR_Cross);
  return;
 }
-rkr->efx_StereoHarm->changepar(11,(int)(o->value()));
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_LR_Cross,(int)(o->value()));
 }
 void SharGui::cb_shar_lrc(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_lrc_i(o,v);
 }
 
 void SharGui::cb_shar_MIDI_i(RKR_Check_Button* o, void*) {
-  rkr->efx_StereoHarm->changepar(10,(int)o->value());
-rkr->RC_Stereo_Harm->cleanup();
+  m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_MIDI,(int)o->value());
+m_process->RC_Stereo_Harm->cleanup();
 
 if(!(int)o->value())
 {
-rkr->efx_StereoHarm->changepar(3,rkr->efx_StereoHarm->getpar(3));
-rkr->efx_StereoHarm->changepar(6,rkr->efx_StereoHarm->getpar(6));
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_L_Chroma,m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_L_Chroma));
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_R_Chroma,m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_R_Chroma));
 };
 }
 void SharGui::cb_shar_MIDI(RKR_Check_Button* o, void* v) {
@@ -165,19 +162,19 @@ void SharGui::cb_shar_MIDI(RKR_Check_Button* o, void* v) {
 }
 
 void SharGui::cb_shar_SELECT_i(RKR_Check_Button* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(448);
+ m_parent->getMIDIControl(MC_Sharm_Select);
  return;
 }
-rkr->efx_StereoHarm->changepar(7,(int)o->value());
-rkr->RC_Stereo_Harm->cleanup();
-rgui->Chord(1);
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_Select,(int)o->value());
+m_process->RC_Stereo_Harm->cleanup();
+m_parent->Chord(1);
 
 if(!(int)o->value())
 {
-rkr->efx_StereoHarm->changepar(3,rkr->efx_StereoHarm->getpar(3));
-rkr->efx_StereoHarm->changepar(6,rkr->efx_StereoHarm->getpar(6));
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_L_Chroma,m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_L_Chroma));
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_R_Chroma,m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_R_Chroma));
 };
 }
 void SharGui::cb_shar_SELECT(RKR_Check_Button* o, void* v) {
@@ -185,38 +182,42 @@ void SharGui::cb_shar_SELECT(RKR_Check_Button* o, void* v) {
 }
 
 void SharGui::cb_shar_note_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(366);
+ m_parent->getMIDIControl(MC_Sharm_Note);
  return;
 }
-rkr->efx_StereoHarm->changepar(8,(int)o->value());
-rgui->Chord(1);
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_Note,(int)o->value());
+m_parent->Chord(1);
 }
 void SharGui::cb_shar_note(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_note_i(o,v);
 }
 
 void SharGui::cb_shar_type_i(RKR_Slider* o, void*) {
-  if(Fl::event_button()==3)
+  if(Fl::event_button()==FL_RIGHT_MOUSE)
 {
- rgui->getMIDIControl(367);
+ m_parent->getMIDIControl(MC_Sharm_Chord);
  return;
 }
-rkr->efx_StereoHarm->changepar(9,(int)o->value());
-rgui->Chord(1);
+m_process->Rack_Effects[EFX_STEREOHARM]->changepar(Sharm_Chord,(int)o->value());
+m_parent->Chord(1);
 }
 void SharGui::cb_shar_type(RKR_Slider* o, void* v) {
   ((SharGui*)(o->parent()))->cb_shar_type_i(o,v);
 }
 SharGui::SharGui(int X, int Y, int W, int H, const char *L)
-  : Fl_Group(0, 0, W, H, L) {
+  : RKR_Gui_Effect(0, 0, W, H, L) {
 this->box(FL_UP_BOX);
 this->color(FL_FOREGROUND_COLOR);
 this->selection_color(FL_FOREGROUND_COLOR);
-this->user_data((void*)(1));
+this->labeltype(FL_NO_LABEL);
+this->labelfont(0);
+this->labelsize(14);
+this->labelcolor(FL_FOREGROUND_COLOR);
 this->align(Fl_Align(96|FL_ALIGN_INSIDE));
-{ shar_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
+this->when(FL_WHEN_RELEASE);
+{ RKR_Light_Button* o = shar_activar = new RKR_Light_Button(5, 4, 34, 18, "On");
   shar_activar->box(FL_UP_BOX);
   shar_activar->shortcut(0x30);
   shar_activar->color((Fl_Color)62);
@@ -225,11 +226,12 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   shar_activar->labelfont(0);
   shar_activar->labelsize(10);
   shar_activar->labelcolor(FL_FOREGROUND_COLOR);
-  shar_activar->callback((Fl_Callback*)cb_shar_activar, (void*)(2));
+  shar_activar->callback((Fl_Callback*)cb_shar_activar);
   shar_activar->align(Fl_Align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE));
   shar_activar->when(FL_WHEN_CHANGED);
+  activate_effect = o;
 } // RKR_Light_Button* shar_activar
-{ shar_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
+{ RKR_Choice* o = shar_preset = new RKR_Choice(77, 4, 76, 18, "Preset");
   shar_preset->box(FL_FLAT_BOX);
   shar_preset->down_box(FL_BORDER_BOX);
   shar_preset->color(FL_BACKGROUND_COLOR);
@@ -240,10 +242,11 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   shar_preset->labelcolor(FL_BACKGROUND2_COLOR);
   shar_preset->textsize(10);
   shar_preset->textcolor(FL_BACKGROUND2_COLOR);
-  shar_preset->callback((Fl_Callback*)cb_shar_preset, (void*)(12042));
+  shar_preset->callback((Fl_Callback*)cb_shar_preset, (void*)(UD_PRESET_STEREOHARM));
   shar_preset->align(Fl_Align(FL_ALIGN_LEFT));
   shar_preset->when(FL_WHEN_RELEASE_ALWAYS);
   shar_preset->menu(menu_shar_preset);
+  preset_choice = o;
 } // RKR_Choice* shar_preset
 { shar_WD = new RKR_Slider(56, 26, 100, 10, "Dry/Wet");
   shar_WD->type(5);
@@ -392,7 +395,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   shar_MIDI->labelfont(0);
   shar_MIDI->labelsize(10);
   shar_MIDI->labelcolor(FL_BACKGROUND2_COLOR);
-  shar_MIDI->callback((Fl_Callback*)cb_shar_MIDI, (void*)(2));
+  shar_MIDI->callback((Fl_Callback*)cb_shar_MIDI);
   shar_MIDI->align(Fl_Align(FL_ALIGN_RIGHT));
   shar_MIDI->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* shar_MIDI
@@ -405,7 +408,7 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
   shar_SELECT->labelfont(0);
   shar_SELECT->labelsize(10);
   shar_SELECT->labelcolor(FL_BACKGROUND2_COLOR);
-  shar_SELECT->callback((Fl_Callback*)cb_shar_SELECT, (void*)(2));
+  shar_SELECT->callback((Fl_Callback*)cb_shar_SELECT);
   shar_SELECT->align(Fl_Align(FL_ALIGN_RIGHT));
   shar_SELECT->when(FL_WHEN_RELEASE);
 } // RKR_Check_Button* shar_SELECT
@@ -455,4 +458,48 @@ this->align(Fl_Align(96|FL_ALIGN_INSIDE));
 } // RKR_Slider* shar_type
 position(X, Y);
 end();
+}
+
+void SharGui::parameter_refresh(int index) {
+  switch (index)
+      {
+      case Sharm_DryWet:
+          shar_WD->value(Dry_Wet(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_DryWet)));
+          break;
+      case Sharm_L_Gain:
+          shar_ganl->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_L_Gain)-64);
+          break;
+      case Sharm_L_Interval:
+          shar_intl->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_L_Interval)-12);
+          break;
+      case Sharm_L_Chroma:
+          shar_chl->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_L_Chroma));
+          break;
+      case Sharm_R_Gain:
+          shar_ganr->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_R_Gain)-64);
+          break;
+      case Sharm_R_Interval:
+          shar_intr->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_R_Interval)-12);
+          break;
+      case Sharm_R_Chroma:
+          shar_chr->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_R_Chroma));
+          break;
+      case Sharm_Select:
+          shar_SELECT->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_Select));
+          break;
+      case Sharm_Note:
+          shar_note->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_Note));
+          m_parent->Chord(1);
+          break;
+      case Sharm_Chord:
+          shar_type->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_Chord));
+          m_parent->Chord(1);
+          break;
+      case Sharm_MIDI:
+          shar_MIDI->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_MIDI));
+          break;
+      case Sharm_LR_Cross:
+          shar_lrc->value(m_process->Rack_Effects[EFX_STEREOHARM]->getpar(Sharm_LR_Cross));
+          break;
+      }
 }

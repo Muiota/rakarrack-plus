@@ -6,13 +6,13 @@
 #include "RKR_Light_Button.h"
 #include "RKR_Check_Button.h"
 #include "RKR_Choice.h"
-#include <FL/Fl_Group.H>
+#include "RKR_GUI_Effect.h"
 #include "RKR_Slider.h"
 #include "../process.h"
 #include "rakarrack.h"
 #include "common_gui_menu.h"
 
-class ChorusGui : public Fl_Group {
+class ChorusGui : public RKR_Gui_Effect {
 public:
   ChorusGui(int X, int Y, int W, int H, const char *L = 0);
   RKR_Light_Button *chorus_activar;
@@ -86,5 +86,8 @@ private:
   inline void cb_chorus_LR_i(RKR_Slider*, void*);
   static void cb_chorus_LR(RKR_Slider*, void*);
   CommonGuiMenu *m_lfo_menu; 
+public:
+  void parameter_refresh(int index);
+  void tap_tempo_update();
 };
 #endif
