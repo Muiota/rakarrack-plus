@@ -102,7 +102,7 @@ Vocoder::Vocoder(float *auxresampled_, int bands, int DS, int uq, int dq,
 
     setbands(VOC_BANDS, 200.0f, 4000.0f);
     init_filters();
-    setpreset(Ppreset);
+    Vocoder::setpreset(Ppreset);
 }
 
 Vocoder::~Vocoder()
@@ -159,25 +159,17 @@ Vocoder::reset_parameters(std::vector<int> parameters)
     cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Vocoder::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        adjust(DS_state, fSAMPLE_RATE);
-        clear_initialize();
-        initialize();
-        setbands(VOC_BANDS, 200.0f, 4000.0f);
-        init_filters();
-        adjustq(Pqq);
-    }
-    else
-    {
-        PERIOD = period;
-        adjust(DS_state, fSAMPLE_RATE);
-    }
+    PERIOD = period_master = period;
+    adjust(DS_state, fSAMPLE_RATE);
+    clear_initialize();
+    initialize();
+    setbands(VOC_BANDS, 200.0f, 4000.0f);
+    init_filters();
+    adjustq(Pqq);
 }
 #endif // LV2
 
@@ -436,7 +428,7 @@ Vocoder::out(float * efxoutl, float * efxoutr)
     { //apply compression to auxresampled
         float auxtemp = input * tmpaux[i];
 
-        if (fabs(auxtemp > compeak))
+        if (auxtemp > compeak)
         {
             compeak = fabs(auxtemp);                        //  First do peak detection on the signal
         }
@@ -570,7 +562,7 @@ Vocoder::setbands(int numbands, float startfreq, float endfreq)
         filterbank[k].r->setfreq_and_q(filterbank[k].sfreq, filterbank[k].sq);
         filterbank[k].aux->setfreq_and_q(filterbank[k].sfreq, filterbank[k].sq);
     }
-    cleanup();
+    Vocoder::cleanup();
 }
 
 /*

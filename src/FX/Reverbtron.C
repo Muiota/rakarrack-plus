@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "Reverbtron.h"
+#include "../strlcpy.h"
 
 Reverbtron::Reverbtron(int DS, int uq, int dq,
                        double sample_rate, uint32_t intermediate_bufsize) :
@@ -119,8 +120,8 @@ Reverbtron::Reverbtron(int DS, int uq, int dq,
     U_Resample = new Resample(uq);
     D_Resample = new Resample(dq);  //Downsample, uses sinc interpolation for bandlimiting to avoid aliasing
 
-    setpreset(Ppreset);
-    cleanup();
+    Reverbtron::setpreset(Ppreset);
+    Reverbtron::cleanup();
 }
 
 Reverbtron::~Reverbtron()
@@ -183,24 +184,19 @@ Reverbtron::reset_parameters(std::vector<int> parameters)
     cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Reverbtron::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        adjust(DS_state, fSAMPLE_RATE);
-        clear_initialize();
-        initialize();
-        setlpf(Plpf);
-        sethidamp(Phidamp);
-    }
-    else
-    {
-        PERIOD = period;
-        adjust(DS_state, fSAMPLE_RATE);
-    }
+    PERIOD = period_master = period;
+    adjust(DS_state, fSAMPLE_RATE);
+    clear_initialize();
+    initialize();
+#ifdef RKR_PLUS_LV2
+    setfile(Filenum);
+#endif
+    setlpf(Plpf);
+    sethidamp(Phidamp);
 }
 #endif // LV2
 
@@ -587,7 +583,7 @@ Reverbtron::setfile(int value)
     {
         Filenum = value;
         memset(Filename, 0, sizeof (Filename));
-        sprintf(Filename, "%s/%d.rvb", DATADIR, Filenum + 1); // DATADIR comes from CMakeLists.txt
+        snprintf(Filename, sizeof(Filename), "%s/%d.rvb", DATADIR, Filenum + 1); // DATADIR comes from CMakeLists.txt
     }
 #ifndef LV2_SUPPORT // Rakarrack-plus only, user files must be in User Directory
     else    // User file
@@ -610,7 +606,7 @@ Reverbtron::setfile(int value)
                 // placed in the User Directory.
                 file_found = 1;
                 memset(Filename, 0, sizeof (Filename));
-                sprintf(Filename, "%s", RVB_Files[i].User_File_Name.c_str());
+                snprintf(Filename, sizeof(Filename), "%s", RVB_Files[i].User_File_Name.c_str());
                 break;
             }
         }
@@ -710,7 +706,7 @@ Reverbtron::loadfile(char* filename)
         return (f);
     }
     
-    strcpy(f.Filename, filename);
+    RKRP::strlcpy(f.Filename, filename, sizeof(f.Filename));
     memset(f.tdata, 0, sizeof (float)*2000);
     memset(f.ftime, 0, sizeof (float)*2000);
 
@@ -800,7 +796,7 @@ Reverbtron::applyfile(const RvbFile &file)
 RvbFile Reverbtron::loaddefault()
 {
     RvbFile f;
-    strcpy(f.Filename, "default");
+    RKRP::strlcpy(f.Filename, "default", sizeof(f.Filename));
     f.data_length = Llength = 2;
     f.ftime[0] = 1.0f;
     f.ftime[1] = 1.25f;

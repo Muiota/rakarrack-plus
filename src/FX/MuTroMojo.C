@@ -81,9 +81,9 @@ MuTroMojo::MuTroMojo(double sample_rate, uint32_t intermediate_bufsize) :
     lfo = new EffectLFO(sample_rate);
 
     initialize();
-    setpreset(Ppreset);
+    MuTroMojo::setpreset(Ppreset);
 
-    cleanup();
+    MuTroMojo::cleanup();
 }
 
 MuTroMojo::~MuTroMojo()
@@ -136,7 +136,7 @@ MuTroMojo::out(float * efxoutl, float * efxoutr)
             
             if (variq)
             {
-                q = f_pow2((2.0f * (1.0f - rms) + 1.0f));
+                q = f_pow2(2.0f * (1.0f - rms) + 1.0f);
             }
             
             filterl->setq(q);
@@ -163,7 +163,7 @@ MuTroMojo::out(float * efxoutl, float * efxoutr)
 
         if (variq)
         {
-            q = f_pow2((2.0f * (1.0f - rms) + 1.0f));
+            q = f_pow2(2.0f * (1.0f - rms) + 1.0f);
         }
 
         float lmod = (lfol + rms);
@@ -201,25 +201,18 @@ MuTroMojo::cleanup()
     filterr->cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 MuTroMojo::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        reinitfilter();
-        filterl->setstages(Pstages);
-        filterr->setstages(Pstages);
-        filterl->setmode(Pqm);
-        filterr->setmode(Pqm);
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    reinitfilter();
+    filterl->setstages(Pstages);
+    filterr->setstages(Pstages);
+    filterl->setmode(Pqm);
+    filterr->setmode(Pqm);
 
     lfo->updateparams(period);
 }
@@ -234,14 +227,14 @@ MuTroMojo::set_random_parameters()
         {
             case MuTro_LFO_Tempo:
             {
-                int value = (int) (RND * 600);
+                int value = (int) (RND * LFO_FREQ_MAX);
                 changepar (i, value + 1);
             }
             break;
 
             case MuTro_LFO_Type:
             {
-                int value = (int) (RND * 12);
+                int value = (int) (RND * LFO_NUM_TYPES);
                 changepar (i, value);
             }
             break;

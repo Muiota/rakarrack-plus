@@ -59,7 +59,7 @@ Gate::Gate(double sample_rate, uint32_t intermediate_bufsize) :
     hpfr(NULL)
 {
     initialize();
-    setpreset(0);
+    Gate::setpreset(0);
 }
 
 Gate::~Gate()
@@ -77,22 +77,16 @@ Gate::cleanup()
     env = 0.0f;
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Gate::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        setlpf(Plpf);
-        sethpf(Phpf);
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    setlpf(Plpf);
+    sethpf(Phpf);
+    cleanup();
 }
 #endif // LV2
 

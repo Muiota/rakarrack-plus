@@ -76,8 +76,8 @@ Harmonizer::Harmonizer(long int Quality, int DS, int uq, int dq,
     PS = new PitchShifter(window, hq, nfSAMPLE_RATE);
     PS->ratio = 1.0f;
 
-    setpreset(Ppreset);
-    cleanup();
+    Harmonizer::setpreset(Ppreset);
+    Harmonizer::cleanup();
 }
 
 Harmonizer::~Harmonizer()
@@ -119,25 +119,17 @@ Harmonizer::reset_parameters(std::vector<int> parameters)
     cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Harmonizer::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        adjust(DS_state, PERIOD); //readjust now that we know period size
-        clear_initialize();
-        initialize();
-        fsetfreq(fPfreq);
-        fsetgain(fPgain);
-        fsetq(fPq);
-    }
-    else
-    {
-        PERIOD = period;
-        adjust(DS_state, PERIOD); //readjust now that we know period size
-    }
+    PERIOD = period_master = period;
+    adjust(DS_state, PERIOD); //readjust now that we know period size
+    clear_initialize();
+    initialize();
+    fsetfreq(fPfreq);
+    fsetgain(fPgain);
+    fsetq(fPq);
 }
 #endif // LV2
 
@@ -254,9 +246,7 @@ Harmonizer::LV2_parameters(std::string &s_buf, int type)
                 else
                 {
                     s_buf += NTS( getpar( i ) - 64);
-
-                    if ( i !=  Harm_Filter_Q)   // last one no need for delimiter
-                        s_buf += ":";
+                    s_buf += ":";
                 }
             }
             break;
@@ -283,7 +273,8 @@ Harmonizer::LV2_parameters(std::string &s_buf, int type)
                 }
                 else
                 {
-                    // NON_MIXER does not have midi
+                    s_buf += NTS( getpar( i ) );
+                   // last one, no need for delimiter
                 }
             break;
         }
@@ -293,8 +284,8 @@ Harmonizer::LV2_parameters(std::string &s_buf, int type)
 std::string
 Harmonizer::get_URI(int type)
 {
-    if(type == NON_MIXER)
-        return HARMNOMIDLV2_URI;
+    if(type == NON_MIXER_XT)
+        return HARMLV2_URI;
     
     return HARMLV2_URI;
 };
@@ -302,8 +293,8 @@ Harmonizer::get_URI(int type)
 std::string
 Harmonizer::get_name(int type)
 {
-    if(type == NON_MIXER)
-        return HARM_NAME_NO_MIDI;
+    if(type == NON_MIXER_XT)
+        return HARM_NAME;
 
     return HARM_NAME;
 };

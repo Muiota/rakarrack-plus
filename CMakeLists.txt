@@ -1,9 +1,9 @@
 #CMake file for Rakarrack-plus & LV2
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5.1...3.31.1)
 project (rakarrack-plus)
 
-set (PACKAGE_VERSION "1.2.3")
+set (PACKAGE_VERSION "1.3.1")
 
 set (CMAKE_SKIP_RULE_DEPENDENCY OFF)
 
@@ -21,10 +21,12 @@ check_cxx_compiler_flag("-ftree-vectorize" SUPPORT_VECTOR)
 check_cxx_compiler_flag("-maltivec" SUPPORT_ALTIVEC)
 
 option (BuildRakarrackPlus "Build rakarrack-plus" ON)
-option (BuildLV2Plugins "Build rakarack-plus lv2 plugins (RakarrackPlus.lv2)" ON)
+option (BuildRakarrackPlusLV2 "Build rakarrack-plus LV2 (Rakarrack-Plus.lv2)" ON)
+option (BuildLV2Plugins "Build rakarack-plus lv2 plugin effects (RakarrackPlus.lv2)" ON)
 option (BuildCarlaPresets "Build Carla presets for lv2 from default banks" OFF)
+option (EnableNTK "Use NTK toolkit for standalone build" OFF)
 option (EnableNSM "Enable NSM session support" ON)
-option (EnableSysex "Enable Experimental Sysex preset save support" OFF)
+option (EnableSysex "Enable Sysex preset save support" ON)
 option (BuildForDebug "Include gdb debugging support" OFF)
 option (EnableOptimizations "Enable optimizations" ON)
 option (EnableSSE "Enable SSE (default=automatic check)" ON)
@@ -65,20 +67,42 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 set (BuildOptionsBasic
-    "-std=c++11 -Wno-unused-parameter -O3 -ffast-math -pipe -fsigned-char"
+    "-std=c++11 -Wno-unused-parameter -O3 -ffast-math -pipe -fsigned-char -fvisibility=hidden"
     CACHE STRING "basic X86 complier options"
 )
 
 set (BuildOptionsDebug
-    "-std=c++11 -O0 -g3 -ggdb -Wall -Wextra -Wpointer-arith"
+    "-std=c++11 -Wno-cast-function-type -O0 -g3 -ggdb -Wall -Wextra -Wpointer-arith"
     CACHE STRING "Debug build flags"
 )
 
 find_package (PkgConfig REQUIRED)
 
 #dependencies
-SET(FLTK_SKIP_OPENGL TRUE) 
-find_package(FLTK REQUIRED)
+if(BuildRakarrackPlusLV2)
+    pkg_check_modules(NTK ntk REQUIRED)
+    pkg_check_modules(NTK_IMAGES ntk_images REQUIRED)
+endif(BuildRakarrackPlusLV2)
+
+if(BuildRakarrackPlus)
+    if(EnableNTK)
+        pkg_check_modules(NTK ntk REQUIRED)
+        pkg_check_modules(NTK_IMAGES ntk_images REQUIRED)
+        add_definitions(-D'BUILD_TYPE="Built with NTK Library"')
+    else(EnableNTK)
+        SET(FLTK_SKIP_OPENGL TRUE) 
+        find_package(FLTK CONFIG REQUIRED)
+        if(${FLTK_VERSION} VERSION_GREATER_EQUAL 1.4.0)
+            message(STATUS "FLTK version is 1.4.0 or newer.")
+            add_definitions(-D'FLTK_VERSION_1_4=1')
+        else()
+            # If FLTK version is < 1.4 the CONFIG option does not link, so re-run find_package without it.
+            find_package(FLTK REQUIRED)
+            message(STATUS "FLTK version is older than 1.4.0.")
+        endif()
+    endif(EnableNTK)
+endif(BuildRakarrackPlus)
+
 find_package(ALSA REQUIRED alsa>=1.0.17)
 find_package(X11 REQUIRED)
 find_package(Freetype REQUIRED)
@@ -101,7 +125,6 @@ pkg_check_modules(XPM REQUIRED xpm)
 if (EnableNSM)
     pkg_check_modules(LIBLO liblo>=0.26 REQUIRED)
     if (LIBLO_FOUND)
-        add_definitions(-D'NSM_SUPPORT=1')
         mark_as_advanced (LIBLO)
     endif (LIBLO_FOUND)
 endif (EnableNSM)
@@ -150,8 +173,14 @@ mark_as_advanced (FONTCONFIG_LIBRARIES)
 mark_as_advanced (CMAKE_BUILD_TYPE)
 mark_as_advanced (CMAKE_INSTALL_PREFIX)
 mark_as_advanced (ACONNECT)
+
+if(EnableNTK)
+#TODO
+else(EnableNTK)
 mark_as_advanced (FLTK_DIR)
 mark_as_advanced (FLTK_MATH_LIBRARY)
+endif(EnableNTK)
+
 mark_as_advanced (LIBDL)
 mark_as_advanced (LIBRT)
 
@@ -159,10 +188,10 @@ if(EnableSysex)
     add_definitions(-D'SYSEX_SUPPORT=1')
 endif (EnableSysex)
 
-if(BuildRakarrackPlus)
-    install(FILES COPYING AUTHORS ChangeLog NEWS README README.md PACKAGERS.README
+if(BuildRakarrackPlus OR BuildRakarrackPlusLV2)
+    install(FILES COPYING AUTHORS README README.md
         DESTINATION share/doc/rakarrack-plus)
-endif(BuildRakarrackPlus)
+endif(BuildRakarrackPlus OR BuildRakarrackPlusLV2)
 #TODO move from /data to main
 #install(FILES rakarrack-plus-plus.desktop
 #    DESTINATION share/applications)
@@ -210,6 +239,20 @@ else (BuildForDebug)
     endif(EnableOptimizations)
 endif (BuildForDebug)
 
+if (BuildRakarrackPlusLV2)
+    pkg_check_modules(LV2 REQUIRED lv2>=1.0.0)
+    if (LV2_FOUND)
+        if (DEFINED LV2_PATH)
+            set(LV2_INSTALL_DIR_RKRP "${LV2_PATH}/Rakarrack-Plus.lv2" CACHE PATH
+            "Specifies where the LV2 libraries should be installed")
+        else()
+            set(LV2_INSTALL_DIR_RKRP lib/lv2/Rakarrack-Plus.lv2 CACHE PATH
+            "Specifies where the LV2 libraries should be installed")
+        endif()
+        add_subdirectory(src/LV2_Plugin)
+    endif (LV2_FOUND)
+endif (BuildRakarrackPlusLV2)
+
 if (BuildLV2Plugins)
     pkg_check_modules(LV2 REQUIRED lv2>=1.0.0)
     if (LV2_FOUND)
@@ -249,7 +292,7 @@ if (BuildLV2Plugins)
         list(GET RVB 10 NEWNAME)
         configure_file(data/10.rvb lv2data/${NEWNAME}.rvb COPYONLY)
 
-        add_subdirectory(lv2)
+        add_subdirectory(LV2_Effects)
     endif (LV2_FOUND)
 else (BuildLV2Plugins)
     set (BuildCarlaPresets OFF)
@@ -257,12 +300,15 @@ endif (BuildLV2Plugins)
 
 if(BuildRakarrackPlus)
     add_subdirectory(src)
+endif (BuildRakarrackPlus)
+
+if(BuildRakarrackPlus OR BuildRakarrackPlusLV2)
     add_subdirectory(man)
     add_subdirectory(data)
     add_subdirectory(icons)
     add_subdirectory(doc)
     add_subdirectory(extra)
-endif (BuildRakarrackPlus)
+endif (BuildRakarrackPlus OR BuildRakarrackPlusLV2)
 
 
 ##Summarize The Full Configuration
@@ -291,6 +337,7 @@ message (STATUS)
 message (STATUS                    "______________________Library____________________________"  )
 package_status(PKG_CONFIG_FOUND    "PkgConfig. . . . . . . . . . . . . . . . . . . . . . . .:"  )
 package_status(FLTK_FOUND          "FLTK toolkit . . . . . . . . . . . . . . . . . . . . . .:"  )
+package_status(NTK_FOUND           "NTK toolkit. . . . . . . . . . . . . . . . . . . . . . .:"  )
 package_status(ALSA_FOUND          "ALSA MIDI Sequencer support. . . . . . . . . . . . . . .:"  )
 package_status(X11_FOUND           "X11 support. . . . . . . . . . . . . . . . . . . . . . .:"  )
 package_status(Freetype_FOUND      "Freetype support . . . . . . . . . . . . . . . . . . . .:"  )
@@ -320,7 +367,9 @@ package_status(EnableVectorization "Vectorization. . . . . . . . . . . . . . . .
 package_status(EnableAltivec       "Use altiveck . . . . . . . . . . . . . . . . . . . . . .:"  )
 package_status(EnableSSE           "Use sse. . . . . . . . . . . . . . . . . . . . . . . . .:"  )
 package_status(EnableSSE2          "Use sse2 . . . . . . . . . . . . . . . . . . . . . . . .:"  )
+package_status(EnableNTK           "Enable NTK build . . . . . . . . . . . . . . . . . . . .:"  )
 package_status(BuildRakarrackPlus  "Build Rakarrack-plus . . . . . . . . . . . . . . . . . .:"  )
+package_status(BuildRakarrackPlusLV2  "Build Rakarrack-Plus-LV2 (Rakarrack-Plus.lv2). . . . . .:"  )
 package_status(BuildLV2Plugins     "Build LV2s (RakarrackPlus.lv2) . . . . . . . . . . . . .:"  )
 package_status(BuildCarlaPresets   "Build Carla lv2 presets. . . . . . . . . . . . . . . . .:"  )
 package_status(BuildForDebug       "Build for debug. . . . . . . . . . . . . . . . . . . . .:"  )

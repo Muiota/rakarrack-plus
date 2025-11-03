@@ -80,8 +80,8 @@ Shifter::Shifter(long int Quality, int DS, int uq, int dq,
     PS = new PitchShifter(window, hq, nfSAMPLE_RATE);
     PS->ratio = 1.0f;
 
-    setpreset(Ppreset);
-    cleanup();
+    Shifter::setpreset(Ppreset);
+    Shifter::cleanup();
 }
 
 Shifter::~Shifter()
@@ -126,22 +126,15 @@ Shifter::reset_parameters(std::vector<int> parameters)
     cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Shifter::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        adjust(DS_state, fSAMPLE_RATE);
-        clear_initialize();
-        initialize();
-    }
-    else
-    {
-        PERIOD = period;
-        adjust(DS_state, fSAMPLE_RATE);
-    }
+    PERIOD = period_master = period;
+    adjust(DS_state, fSAMPLE_RATE);
+    clear_initialize();
+    initialize();
+    cleanup();
 }
 #endif // LV2
 

@@ -84,7 +84,7 @@ Infinity::Infinity(double sample_rate, uint32_t intermediate_bufsize) :
     alpha = dt / (0.5f + dt); //200ms time constant on parameter change -- quick but not jerky
     beta = 1.0f - alpha;
 
-    setpreset(Ppreset);
+    Infinity::setpreset(Ppreset);
     adjustfreqs();
     reinitfilter();
 }
@@ -278,23 +278,16 @@ Infinity::cleanup()
     }
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Infinity::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        cleanup();
-        adjustfreqs();
-        reinitfilter();
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    cleanup();
+    adjustfreqs();
+    reinitfilter();
 }
 #endif // LV2
 

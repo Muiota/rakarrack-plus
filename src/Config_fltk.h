@@ -30,10 +30,6 @@
 
 #include <FL/Fl_Preferences.H>
 
-/**
- * The number of rack effects.
- */
-const int C_NUMBER_EFFECTS = 47;
 
 class Config_fltk {
 public:
@@ -262,6 +258,7 @@ public:
     int Velocity_Adjust;
     int Converter_Octave;
     int MIDI_Converter_On_Off;
+    int Use_FFT;
 
     // Metronome
     int Metronome_Time;
@@ -292,7 +289,11 @@ public:
     int Rand_Active;
     int Rand_Current;
     int Rand_Max;
-    char Rand_Exclude[C_NUMBER_EFFECTS + 1];
+    char Rand_Exclude[EFX_NUMBER_EFFECTS + 1];
+
+    // Analyzer and Scope
+    bool Analyzer_On_Off;
+    bool Scope_On_Off;
 
     // NSM
 #ifdef NSM_SUPPORT

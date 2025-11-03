@@ -118,8 +118,8 @@ Sequence::Sequence(long int Quality, int DS, int uq, int dq,
     PS = new PitchShifter(window, hq, nfSAMPLE_RATE);
     PS->ratio = 1.0f;
 
-    setpreset(Ppreset);
-    cleanup();
+    Sequence::setpreset(Ppreset);
+    Sequence::cleanup();
 }
 
 Sequence::~Sequence()
@@ -174,25 +174,17 @@ Sequence::reset_parameters(std::vector<int> parameters)
     cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Sequence::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        adjust(DS_state, fSAMPLE_RATE);
-        clear_initialize();
-        initialize();
-        filterl->setmix(1, 0.33f, -1.0f, 0.25f);
-        filterr->setmix(1, 0.33f, -1.0f, 0.25f);
-        cleanup();
-    }
-    else
-    {
-        PERIOD = period;
-        adjust(DS_state, fSAMPLE_RATE);
-    }
+    PERIOD = period_master = period;
+    adjust(DS_state, fSAMPLE_RATE);
+    clear_initialize();
+    initialize();
+    filterl->setmix(1, 0.33f, -1.0f, 0.25f);
+    filterr->setmix(1, 0.33f, -1.0f, 0.25f);
+    cleanup();
 }
 #endif // LV2
 
@@ -382,7 +374,7 @@ Sequence::out(float * efxoutl, float * efxoutr)
         avflag = 0;
     }
 
-    int hPERIOD = 0;
+    unsigned int hPERIOD = 0;
     if ((Pmode == 3) || (Pmode == 5) || (Pmode == 6))
     {
         hPERIOD = nPERIOD;

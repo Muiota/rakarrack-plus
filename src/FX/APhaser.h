@@ -82,7 +82,7 @@ public:
     int get_number_efx_parameters () {return C_APHASER_PARAMETERS;};
     void set_random_parameters();
     
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
     void lv2_update_params(uint32_t period);
 #endif // LV2
     virtual void LV2_parameters(std::string &s_buf, int type);
@@ -91,8 +91,9 @@ public:
 
 private:
     float fPERIOD;
+protected:
     uint32_t PERIOD;
-    
+private:
     //Phaser parameters
     int Pvolume;        //Used in Process.C to set wet/dry mix
     int Pdistortion;    //Model distortion added by FET element
@@ -100,10 +101,14 @@ private:
     int Pfb;		//feedback
     int Poffset;	//Model mismatch between variable resistors
     int Pstages;	//Number of first-order All-Pass stages
+protected:
     int Poutsub;	//if I wish to subtract the output instead of the adding it
     int Phyper;		//lfo^2 -- converts tri into hyper-sine
+private:
     int Pdepth;         //Depth of phaser sweep
     int Pbarber;         //Enable barber pole phasing
+
+protected:
 
     //Control parameters
     void setvolume (int _Pvolume);
@@ -115,7 +120,8 @@ private:
     void setdepth (int _Pdepth);
 
     //Internal Variables
-    bool barber;			//Barber pole phasing flag
+    bool barber;                //Barber pole phasing flag
+private:
     float distortion, fb, width, offsetpct, fbl, fbr, depth;
     float *lxn1, *lyn1,*rxn1, *ryn1, *offset;
     float oldlgain, oldrgain, rdiff, ldiff, invperiod;
@@ -128,6 +134,7 @@ private:
     float C;	        // Capacitor
     float CFs;		// A constant derived from capacitor and resistor relationships
 
+protected:
     EffectLFO *lfo;		//Phaser modulator
 
 };

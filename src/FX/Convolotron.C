@@ -100,8 +100,8 @@ Convolotron::Convolotron(int DS, int uq, int dq, double sample_rate, uint16_t in
     U_Resample = new Resample(uq);
     D_Resample = new Resample(dq); //Downsample, uses sinc interpolation for bandlimiting to avoid aliasing
     
-    setpreset(Ppreset);
-    cleanup();
+    Convolotron::setpreset(Ppreset);
+    Convolotron::cleanup();
 };
 
 Convolotron::~Convolotron()
@@ -153,20 +153,13 @@ Convolotron::reset_parameters(std::vector<int> parameters)
     }
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Convolotron::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
 
     adjust(DS_state, period);
 }
@@ -530,7 +523,7 @@ Convolotron::setfile(int value)
     {
         Filenum = value;
         memset(Filename, 0, sizeof (Filename));
-        sprintf(Filename, "%s/%d.wav", DATADIR, Filenum + 1);
+        snprintf(Filename, sizeof(Filename), "%s/%d.wav", DATADIR, Filenum + 1);
     }
 #ifndef LV2_SUPPORT // Rakarrack-plus only, user files must be in User Directory
     else    // User file
@@ -553,7 +546,7 @@ Convolotron::setfile(int value)
                 // placed in the User Directory.
                 file_found = 1;
                 memset(Filename, 0, sizeof (Filename));
-                sprintf(Filename, "%s", WAV_Files[i].User_File_Name.c_str());
+                snprintf(Filename, sizeof(Filename), "%s", WAV_Files[i].User_File_Name.c_str());
                 break;
             }
         }

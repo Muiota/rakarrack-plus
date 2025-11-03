@@ -82,10 +82,12 @@
 #include "FX/Opticaltrem.h"
 #include "FX/Vibe.h"
 #include "FX/Infinity.h"
+#include "FX/ResSolution.h"
 #include "FX/ParametricEQ.h"
 #include "EFX_common/beattracker.h"
 #include <jack/jack.h>
 #include <sstream>
+#include <pthread.h>
 
 
 /**
@@ -592,7 +594,18 @@ enum MIDI_Learn_Index
     MC_VaryBand_LFO_Type_1,
     MC_VaryBand_LFO_Type_2,
     MC_Vibe_LFO_Type,
-    MC_WahWah_LFO_Type          // 470
+    MC_WahWah_LFO_Type,         // 470
+            
+    MC_Ressol_DryWet,
+    MC_Ressol_Distortion,
+    MC_Ressol_LFO_Tempo,
+    MC_Ressol_LFO_Stereo,
+    MC_Ressol_Width,
+    MC_Ressol_Feedback,
+    MC_Ressol_Mismatch,
+    MC_Ressol_Depth,
+    TOTAL_MC_Parameter_Size
+
 };
 
 /**
@@ -624,13 +637,6 @@ enum GUI_Refresh_Index
 };
 
 /**
- * The total Number of MIDI controllable parameters.
- * This is the total of listed items in the MIDI learn window.
- * If any new parameters are added, this must be adjusted.
- */
-const int C_MC_PARAMETER_SIZE = 446;
-
-/**
  * Magic number 25 is Bank Select (CC 0) and the Unused cases from the default MIDI control
  * (0, 10, 11, 13, (15 > 19), (33 > 45), 64) = 23 -- Unused
  * plus 128, 129 also Unused  = 23 + 2 = 25.
@@ -638,6 +644,14 @@ const int C_MC_PARAMETER_SIZE = 446;
  * C_MC_PARAMETER_SIZE, this value must be adjusted.
  */
 const int C_MC_UNUSED_PARAMETERS = 25;
+
+/**
+ * The total Number of MIDI controllable parameters.
+ * This is the total of listed items in the MIDI learn window.
+ * If any new parameters are added, this must be adjusted.
+ */
+const int C_MC_PARAMETER_SIZE = TOTAL_MC_Parameter_Size - C_MC_UNUSED_PARAMETERS;
+
 
 /**
  * The total MIDI control range used in switch() case function.
@@ -654,16 +668,30 @@ const unsigned char  EVENT_SYSEX            = 0xF0;
 const unsigned char  EVENT_SYSEX_END        = 0xF7;
 #endif
 
+/* To be incremented if anything changes */
+#ifdef RKR_PLUS_LV2
+const int C_LV2_STATE_VERSION = 1;
+#endif
+
 class RKR
 {
 
 public:
 
-    explicit RKR (int gui);
+    explicit RKR (uint32_t _sample_rate, uint32_t _period, int gui);
     ~RKR ();
 
     // process.C
-    int jack_open_client();
+    void initialize(bool re_initialize = false);
+    void delete_everything();
+    void reset_all_effects(bool need_state_restore = true);
+    void reset_everything();
+    void reset_join_thread();
+#ifdef RKR_PLUS_LV2
+    void set_client_name(std::string s_name);
+#else
+    void set_jack_client(jack_client_t *_jackclient);
+#endif
     void load_user_preferences();
     void instantiate_effects();
     void initialize_arrays();
@@ -690,7 +718,14 @@ public:
     void Conecta ();
     void conectaaconnect ();
     void disconectaaconnect ();
+#ifdef RKR_PLUS_LV2
+    void lv2_process_midi_program_changes();
+    void lv2_join_thread();
+#else
     void jack_process_midievents (jack_midi_event_t *midievent);
+#endif
+    void lv2_process_midievents(const uint8_t* const msg);
+    void lv2_set_bpm(float a_bpm);
     void process_midi_controller_events(int parameter, int value, int preset = C_CHANGE_PRESET_OFF);
     void start_sysex(void);
     bool append_sysex( unsigned char *a_data, long a_size );
@@ -705,6 +740,14 @@ public:
     void save_preset (const std::string &filename);
     void load_preset (const std::string &filename);
     void set_audio_paramters ();
+    int rkr_save_state(std::string &s_buf);
+    void rkr_restore_state(const std::string &s_buf);
+    int LV2_save_preferences(std::string &s_buf);
+    void LV2_restore_preferences(const std::string &s_buf);
+    void check_preferences_changed(std::vector<int> &s_vect);
+#ifdef RKR_PLUS_LV2
+    void lv2_update_params(uint32_t period);
+#endif
     void load_custom_MIDI_table_preset_names();
     void revert_file_to_bank(int lv_revert[C_MAX_EFFECTS][C_MAX_PARAMETERS], int size);
     void convert_bank_to_file(int lv_convert[C_MAX_EFFECTS][C_MAX_PARAMETERS], int size);
@@ -770,18 +813,18 @@ public:
     /**
      * Pointer array to all rack effects, indexed by EFX_Index.
      */
-    class Effect *Rack_Effects[C_NUMBER_EFFECTS];
+    class Effect *Rack_Effects[EFX_NUMBER_EFFECTS];
     
     /**
      * To hold the number of user controlled parameters for each effect.
      * Indexed by EFX_Index.
      */
-    int EFX_Param_Size[C_NUMBER_EFFECTS];
+    int EFX_Param_Size[EFX_NUMBER_EFFECTS];
 
     /**
      * Arrays to hold bypass flags for each effect, indexed by EFX_Index.
      */
-    int EFX_Active[C_NUMBER_EFFECTS];
+    int EFX_Active[EFX_NUMBER_EFFECTS];
 
     class Limiter *efx_FLimiter;
 
@@ -791,9 +834,12 @@ public:
     class AnalogFilter *DC_Offsetl;
     class AnalogFilter *DC_Offsetr;
 
+#ifdef RKR_PLUS_LV2
+    pthread_t t_pgm;
+#endif
+    pthread_t t_init;
+
     jack_client_t *jackclient;
-    jack_options_t options;
-    jack_status_t status;
     char jackcliname[64];
     int Jack_Shut_Down;
 
@@ -814,10 +860,21 @@ public:
     int ACI_Active;     // Analog control (trigger window)
 
     /**
-     * Flag to indicate the program should terminate (user request).
+     * Flag to indicate the program should terminate (user request). Or,
+     * for LV2, the custom GUI is to be hidden, either by host or user.
      * 1 to quit, 0 to continue. Used in Main() processing loop.
      */
     int Exit_Program;
+
+    /**
+     * Flag for indicating the re-initialization is in progress.
+     */
+    int Re_init_in_progress;
+
+    bool sco_anal_need_init;
+    bool need_bogomips_message;
+    bool handle_bogomips_message;
+    bool lv2_is_active;
 
     /**
      * The current user selected bank preset index from button press in Bank window or
@@ -831,6 +888,8 @@ public:
      * This is processed in GuiTimeout.
      */
     int Change_Preset;
+
+    int hold_preset;
     
     /**
      * Flag to indicate that a MIDI CC bank change has occurred. For GUI update.
@@ -870,11 +929,6 @@ public:
      which get caught by the below mouse function.
     */
     int Shut_Off_Below_Mouse;
-    
-    /**
-     * Flag to indicate that a Jack client cannot be created.
-     */
-    int No_Jack_Client;
 
     /**
      * Flag to indicate if a bank is set from the command line.
@@ -957,7 +1011,6 @@ public:
     uint32_t JACK_SAMPLE_RATE;
     uint32_t JACK_PERIOD;
     uint32_t period_master;
-    float fPeriod;
     uint32_t sample_rate;
     float fSample_rate;
     float cSample_rate;
@@ -1068,6 +1121,10 @@ public:
     float booster;
     float cpuload;
 
+#ifdef RKR_PLUS_LV2
+    float *input_l;
+    float *input_r;
+#endif
     float *efxoutl;
     float *efxoutr;
     float *auxdata;
@@ -1227,9 +1284,10 @@ public:
     std::vector<User_Files> Echotron_DLY_Files;
     std::vector<User_Files> Reverbtron_RVB_Files;
 
-
+#ifndef RKR_PLUS_LV2
     // Alsa MIDI
     snd_seq_t *midi_in;
+#endif
     
 #ifdef SYSEX_SUPPORT
     // data for sysex

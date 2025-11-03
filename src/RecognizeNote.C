@@ -283,22 +283,15 @@ Recognize::update_freqs(float tune)
     }
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Recognize::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        setlpf(5500);
-        sethpf(80);
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period;
+    clear_initialize();
+    initialize();
+    setlpf(5500);
+    sethpf(80);
 
     Sus->lv2_update_params(period);
 }

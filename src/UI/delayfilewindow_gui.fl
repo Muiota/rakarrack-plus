@@ -1,5 +1,5 @@
 # data file for the Fltk User Interface Designer (fluid)
-version 1.0308
+version 1.0309
 header_name {.h}
 code_name {.cxx}
 decl {\#include <FL/Fl_File_Chooser.H>} {public global
@@ -27,6 +27,9 @@ decl {\#include "../FX/Echotron.h"} {public global
 }
 
 decl {\#include "rakarrack.h"} {public global
+}
+
+decl {\#include "../strlcpy.h"} {private global
 }
 
 decl {\#define DEFAULT_DLY_FILE_NAME "Delay File - Untitled"} {public global
@@ -71,7 +74,7 @@ decl {class dlyFileGroup;  // forward declaration} {public global
 }
 
 widget_class DelayFileWindowGui {open selected
-  xywh {777 65 800 265} type Double color 4 selection_color 7 resizable
+  xywh {795 305 800 265} type Double color 4 selection_color 7 resizable
   code0 {this->m_process = NULL;}
   code1 {this->m_parent = NULL;}
   class Fl_Double_Window size_range {400 130 1600 530} visible
@@ -119,7 +122,7 @@ widget_class DelayFileWindowGui {open selected
     /* Update the file name if we have one */
     if(strcmp(file.Filename, DEFAULT_DLY_FILE_NAME) != 0 )
     {
-        strcpy(Efx_Echotron->Filename, file.Filename);
+        RKRP::strlcpy(Efx_Echotron->Filename, file.Filename, sizeof(Efx_Echotron->Filename));
     }
 
     /* Set efx gui max file length to the applied file size */
@@ -346,29 +349,29 @@ this->redraw();} {}
 
     // Description
     memset(buf, 0, sizeof (buf));
-    sprintf(buf, "\#%s\\n", dly_description->value());
+    snprintf(buf, sizeof(buf), "\#%s\\n", dly_description->value());
     fputs(buf, fn);
 
     //General
     memset(buf, 0, sizeof (buf));
-    sprintf(buf, "\#Filter  Delay  Mode\\n");   // titles
+    snprintf(buf, sizeof(buf), "\#Filter  Delay  Mode\\n");   // titles
     fputs(buf, fn);
 
     memset(buf, 0, sizeof (buf));
-    sprintf(buf, "%s\\t%s\\t%d\\n",dly_filter->value(), dly_delay->value(), delay_file.f_qmode);
+    snprintf(buf, sizeof(buf), "%s\\t%s\\t%d\\n",dly_filter->value(), dly_delay->value(), delay_file.f_qmode);
     fputs(buf, fn);
 
     memset(buf, 0, sizeof (buf));
-    sprintf(buf, "\#    Pan       Time            Level         LP          BP          HP     Frequency       Q    Stages\\n");   // titles
+    snprintf(buf, sizeof(buf), "\#    Pan       Time            Level         LP          BP          HP     Frequency       Q    Stages\\n");   // titles
     fputs(buf, fn);
     
     for(int i = 0; i < m_file_size; ++i)
     {
     
         memset(buf, 0, sizeof (buf));
-        sprintf
+        snprintf
         (
-        buf, "%9.3f\\t%9.10f\\t%9.4f\\t%9.4f\\t%9.4f\\t%9.4f\\t%9.5f\\t%9.6f\\t%d\\n",
+        buf, sizeof(buf), "%9.3f\\t%9.10f\\t%9.4f\\t%9.4f\\t%9.4f\\t%9.4f\\t%9.5f\\t%9.6f\\t%d\\n",
         delay_file.fPan[i],
         delay_file.fTime[i],
         delay_file.fLevel[i],
@@ -388,7 +391,7 @@ this->redraw();} {}
   } {
     code {DlyFile delay_file;
 
-  strcpy(delay_file.Filename, this->label());
+  RKRP::strlcpy(delay_file.Filename, this->label(), sizeof(delay_file.Filename));
   delay_file.fLength = (float)m_file_size;
   
   delay_file.subdiv_fmod = (double) strtod(dly_filter->value(), NULL);
@@ -599,7 +602,8 @@ vector_delay_line = vector_temp;} {}
 
 widget_class dlyFileGroup {
   user_data UD_delay_group open
-  xywh {805 212 745 30} type Double
+  xywh {820 443 745 30} type Double
+  code0 {m_parent = NULL;}
   class RKR_Group visible position_relative
 } {
   decl {DelayFileWindowGui *m_parent;} {private local

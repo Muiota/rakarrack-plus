@@ -45,11 +45,11 @@ Pan::Pan(double sample_rate, uint32_t intermediate_bufsize) :
     lfo(NULL)
 {
     lfo = new EffectLFO(sample_rate);
-    setpreset(Ppreset);
+    Pan::setpreset(Ppreset);
 
     lfo->effectlfoout(&lfol, &lfor);
 
-    cleanup();
+    Pan::cleanup();
 }
 
 Pan::~Pan()
@@ -62,11 +62,11 @@ Pan::cleanup()
 {
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Pan::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
     fPERIOD = period;
     lfo->updateparams(period);
 }
@@ -92,14 +92,14 @@ Pan::set_random_parameters()
 
             case Pan_LFO_Type:
             {
-                int value = (int) (RND * 12);
+                int value = (int) (RND * LFO_NUM_TYPES);
                 changepar (i, value);
             }
             break;
 
             case Pan_LFO_Tempo:
             {
-                int value = (int) (RND * 600);
+                int value = (int) (RND * LFO_FREQ_MAX);
                 changepar (i, value + 1);
             }
             break;

@@ -23,13 +23,20 @@
 
 
 #include "process.h"
+#include "strlcpy.h"
 #include <FL/fl_ask.H>  // for error pop up
 #include <FL/Fl_Preferences.H>
 
+#ifdef RKR_PLUS_LV2
+#include<lv2/lv2plug.in/ns/ext/midi/midi.h>
+#endif
+
 /* MIDI control defines (Max - Min) / 127 - parameter ranges  */
+
+const float C_MC_LFO_RNGE       =  float(LFO_NUM_TYPES - 1) / 127.0;
+
 const float C_MC_7_RANGE        = 0.05511811f;      /* 7 / 127 = 0.055118110236 */
 const float C_MC_8_RANGE        = 0.06299f;         /* 8 / 127 = 0.062992125984252 */
-const float C_MC_11_RANGE       = 0.0866142f;       /* 11 / 127 = 0.0866141732283465*/
 const float C_MC_12_RANGE       = 0.094488189f;     /* 12 / 127 = 0.094488188976 */
 const float C_MC_23_RANGE       = 0.18110236f;      /* 23 / 127 = 0.1811023622047 */
 const float C_MC_24_RANGE       = 0.18897638f;      /* 24 / 127 = 0.188976377953  */
@@ -114,7 +121,7 @@ RKR::MIDI_control()
         "Alienwah Pan",             strdup( NTS(MC_Alien_Pan).c_str()),              strdup( NTS(EFX_ALIENWAH).c_str()),      strdup( NTS(Alien_Pan).c_str()),              "0",     "1.0",
         "Alienwah Tempo",           strdup( NTS(MC_Alien_LFO_Tempo).c_str()),        strdup( NTS(EFX_ALIENWAH).c_str()),      strdup( NTS(Alien_LFO_Tempo).c_str()),        "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Alienwah Random",          strdup( NTS(MC_Alien_LFO_Random).c_str()),       strdup( NTS(EFX_ALIENWAH).c_str()),      strdup( NTS(Alien_LFO_Random).c_str()),       "0",     "1.0",
-        "Alienwah LFO Type",        strdup( NTS(MC_Alien_LFO_Type).c_str()),         strdup( NTS(EFX_ALIENWAH).c_str()),      strdup( NTS(Alien_LFO_Type).c_str()),         "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Alienwah LFO Type",        strdup( NTS(MC_Alien_LFO_Type).c_str()),         strdup( NTS(EFX_ALIENWAH).c_str()),      strdup( NTS(Alien_LFO_Type).c_str()),         "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Alienwah Phase",           strdup( NTS(MC_Alien_Phase).c_str()),            strdup( NTS(EFX_ALIENWAH).c_str()),      strdup( NTS(Alien_Phase).c_str()),            "0",     "1.0",
         "Alienwah Stereo Df.",      strdup( NTS(MC_Alien_LFO_Stereo).c_str()),       strdup( NTS(EFX_ALIENWAH).c_str()),      strdup( NTS(Alien_LFO_Stereo).c_str()),       "0",     "1.0",
         "Alienwah Depth",           strdup( NTS(MC_Alien_Depth).c_str()),            strdup( NTS(EFX_ALIENWAH).c_str()),      strdup( NTS(Alien_Depth).c_str()),            "0",     "1.0",
@@ -123,7 +130,7 @@ RKR::MIDI_control()
         "Alienwah L/R Cross",       strdup( NTS(MC_Alien_LR_Cross).c_str()),         strdup( NTS(EFX_ALIENWAH).c_str()),      strdup( NTS(Alien_LR_Cross).c_str()),         "0",     "1.0",
 
         "Analog Phaser Dry/Wet",    strdup( NTS(MC_APhase_DryWet).c_str()),          strdup( NTS(EFX_ANALOG_PHASER).c_str()), strdup( NTS(APhase_DryWet).c_str()),        "127",     "-1.0",
-        "Analog Phaser LFO Type",   strdup( NTS(MC_APhase_LFO_Type).c_str()),        strdup( NTS(EFX_ANALOG_PHASER).c_str()), strdup( NTS(APhase_LFO_Type).c_str()),        "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Analog Phaser LFO Type",   strdup( NTS(MC_APhase_LFO_Type).c_str()),        strdup( NTS(EFX_ANALOG_PHASER).c_str()), strdup( NTS(APhase_LFO_Type).c_str()),        "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Analog Phaser Tempo",      strdup( NTS(MC_APhase_LFO_Tempo).c_str()),       strdup( NTS(EFX_ANALOG_PHASER).c_str()), strdup( NTS(APhase_LFO_Tempo).c_str()),       "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Analog Phaser P. Depth",   strdup( NTS(MC_APhase_Depth).c_str()),           strdup( NTS(EFX_ANALOG_PHASER).c_str()), strdup( NTS(APhase_Depth).c_str()),           "0",     "1.0",
         "Analog Phaser Width",      strdup( NTS(MC_APhase_Width).c_str()),           strdup( NTS(EFX_ANALOG_PHASER).c_str()), strdup( NTS(APhase_Width).c_str()),           "0",     "1.0",
@@ -150,7 +157,7 @@ RKR::MIDI_control()
         "Chorus Pan",               strdup( NTS(MC_Chorus_Pan).c_str()),             strdup( NTS(EFX_CHORUS).c_str()),        strdup( NTS(Chorus_Pan).c_str()),             "0",     "1.0",
         "Chorus Tempo",             strdup( NTS(MC_Chorus_LFO_Tempo).c_str()),       strdup( NTS(EFX_CHORUS).c_str()),        strdup( NTS(Chorus_LFO_Tempo).c_str()),       "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Chorus Random",            strdup( NTS(MC_Chorus_LFO_Random).c_str()),      strdup( NTS(EFX_CHORUS).c_str()),        strdup( NTS(Chorus_LFO_Random).c_str()),      "0",     "1.0",
-        "Chorus LFO Type",          strdup( NTS(MC_Chorus_LFO_Type).c_str()),        strdup( NTS(EFX_CHORUS).c_str()),        strdup( NTS(Chorus_LFO_Type).c_str()),        "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Chorus LFO Type",          strdup( NTS(MC_Chorus_LFO_Type).c_str()),        strdup( NTS(EFX_CHORUS).c_str()),        strdup( NTS(Chorus_LFO_Type).c_str()),        "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Chorus Stereo Df",         strdup( NTS(MC_Chorus_LFO_Stereo).c_str()),      strdup( NTS(EFX_CHORUS).c_str()),        strdup( NTS(Chorus_LFO_Stereo).c_str()),      "0",     "1.0",
         "Chorus Depth",             strdup( NTS(MC_Chorus_Depth).c_str()),           strdup( NTS(EFX_CHORUS).c_str()),        strdup( NTS(Chorus_Depth).c_str()),           "0",     "1.0",
         "Chorus Delay",             strdup( NTS(MC_Chorus_Delay).c_str()),           strdup( NTS(EFX_CHORUS).c_str()),        strdup( NTS(Chorus_Delay).c_str()),           "0",     "1.0",
@@ -237,7 +244,7 @@ RKR::MIDI_control()
         "Dual Flange LPF",          strdup( NTS(MC_DFlange_LPF).c_str()),            strdup( NTS(EFX_DUAL_FLANGE).c_str()),   strdup( NTS(DFlange_LPF).c_str()),           "20",     strdup( NTS(C_MC_19980_RANGE).c_str()),
         "Dual Flange Tempo",        strdup( NTS(MC_DFlange_LFO_Tempo).c_str()),      strdup( NTS(EFX_DUAL_FLANGE).c_str()),   strdup( NTS(DFlange_LFO_Tempo).c_str()),      "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Dual Flange Stereo Df",    strdup( NTS(MC_DFlange_LFO_Stereo).c_str()),     strdup( NTS(EFX_DUAL_FLANGE).c_str()),   strdup( NTS(DFlange_LFO_Stereo).c_str()),     "0",     "1.0",
-        "Dual Flange LFO Type",     strdup( NTS(MC_DFlange_LFO_Type).c_str()),       strdup( NTS(EFX_DUAL_FLANGE).c_str()),   strdup( NTS(DFlange_LFO_Type).c_str()),       "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Dual Flange LFO Type",     strdup( NTS(MC_DFlange_LFO_Type).c_str()),       strdup( NTS(EFX_DUAL_FLANGE).c_str()),   strdup( NTS(DFlange_LFO_Type).c_str()),       "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Dual Flange Random",       strdup( NTS(MC_DFlange_LFO_Random).c_str()),     strdup( NTS(EFX_DUAL_FLANGE).c_str()),   strdup( NTS(DFlange_LFO_Random).c_str()),     "0",     "1.0",
 
         "Echo Dry/Wet",             strdup( NTS(MC_Echo_DryWet).c_str()),            strdup( NTS(EFX_ECHO).c_str()),          strdup( NTS(Echo_DryWet).c_str()),          "127",     "-1.0",
@@ -258,7 +265,7 @@ RKR::MIDI_control()
         "Echotron Width",           strdup( NTS(MC_Echotron_LFO_Width).c_str()),     strdup( NTS(EFX_ECHOTRON).c_str()),      strdup( NTS(Echotron_LFO_Width).c_str()),     "0",     "1.0",
         "Echotron Depth",           strdup( NTS(MC_Echotron_Depth).c_str()),         strdup( NTS(EFX_ECHOTRON).c_str()),      strdup( NTS(Echotron_Depth).c_str()),         "0",     strdup( NTS(C_MC_128_RANGE).c_str()),
         "Echotron Stereo Df",       strdup( NTS(MC_Echotron_LFO_Stereo).c_str()),    strdup( NTS(EFX_ECHOTRON).c_str()),      strdup( NTS(Echotron_LFO_Stereo).c_str()),    "0",     "1.0",
-        "Echotron LFO Type",        strdup( NTS(MC_Echotron_LFO_Type).c_str()),      strdup( NTS(EFX_ECHOTRON).c_str()),      strdup( NTS(Echotron_LFO_Type).c_str()),      "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Echotron LFO Type",        strdup( NTS(MC_Echotron_LFO_Type).c_str()),      strdup( NTS(EFX_ECHOTRON).c_str()),      strdup( NTS(Echotron_LFO_Type).c_str()),      "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Echotron #",               strdup( NTS(MC_Echotron_Taps).c_str()),          strdup( NTS(EFX_ECHOTRON).c_str()),      strdup( NTS(Echotron_Taps).c_str()),          "1",     strdup( NTS(C_MC_126_RANGE).c_str()),
 
         "Echoverse Dry/Wet",        strdup( NTS(MC_Echoverse_DryWet).c_str()),       strdup( NTS(EFX_ECHOVERSE).c_str()),     strdup( NTS(Echoverse_DryWet).c_str()),     "127",     "-1.0",
@@ -310,7 +317,7 @@ RKR::MIDI_control()
         "Flanger Pan",              strdup( NTS(MC_Flanger_Pan).c_str()),            strdup( NTS(EFX_FLANGER).c_str()),       strdup( NTS(Flanger_Pan).c_str()),            "0",     "1.0",
         "Flanger Tempo",            strdup( NTS(MC_Flanger_LFO_Tempo).c_str()),      strdup( NTS(EFX_FLANGER).c_str()),       strdup( NTS(Flanger_LFO_Tempo).c_str()),      "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Flanger Random",           strdup( NTS(MC_Flanger_LFO_Random).c_str()),     strdup( NTS(EFX_FLANGER).c_str()),       strdup( NTS(Flanger_LFO_Random).c_str()),     "0",     "1.0",
-        "Flanger LFO Type",         strdup( NTS(MC_Flanger_LFO_Type).c_str()),       strdup( NTS(EFX_FLANGER).c_str()),       strdup( NTS(Flanger_LFO_Type).c_str()),       "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Flanger LFO Type",         strdup( NTS(MC_Flanger_LFO_Type).c_str()),       strdup( NTS(EFX_FLANGER).c_str()),       strdup( NTS(Flanger_LFO_Type).c_str()),       "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Flanger Stereo Df",        strdup( NTS(MC_Flanger_LFO_Stereo).c_str()),     strdup( NTS(EFX_FLANGER).c_str()),       strdup( NTS(Flanger_LFO_Stereo).c_str()),     "0",     "1.0",
         "Flanger Depth",            strdup( NTS(MC_Flanger_Depth).c_str()),          strdup( NTS(EFX_FLANGER).c_str()),       strdup( NTS(Flanger_Depth).c_str()),          "0",     "1.0",
         "Flanger Delay",            strdup( NTS(MC_Flanger_Delay).c_str()),          strdup( NTS(EFX_FLANGER).c_str()),       strdup( NTS(Flanger_Delay).c_str()),          "0",     "1.0",
@@ -379,7 +386,7 @@ RKR::MIDI_control()
         "MuTroMojo LP",             strdup( NTS(MC_MuTro_LowPass).c_str()),          strdup( NTS(EFX_MUTROMOJO).c_str()),     strdup( NTS(MuTro_LowPass).c_str()),        "-64",     "1.0",
         "MuTroMojo BP",             strdup( NTS(MC_MuTro_BandPass).c_str()),         strdup( NTS(EFX_MUTROMOJO).c_str()),     strdup( NTS(MuTro_BandPass).c_str()),       "-64",     "1.0",
         "MuTroMojo HP",             strdup( NTS(MC_MuTro_HighPass).c_str()),         strdup( NTS(EFX_MUTROMOJO).c_str()),     strdup( NTS(MuTro_HighPass).c_str()),       "-64",     "1.0",
-        "MuTroMojo LFO Type",       strdup( NTS(MC_MuTro_LFO_Type).c_str()),         strdup( NTS(EFX_MUTROMOJO).c_str()),     strdup( NTS(MuTro_LFO_Type).c_str()),         "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "MuTroMojo LFO Type",       strdup( NTS(MC_MuTro_LFO_Type).c_str()),         strdup( NTS(EFX_MUTROMOJO).c_str()),     strdup( NTS(MuTro_LFO_Type).c_str()),         "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "MuTroMojo Depth",          strdup( NTS(MC_MuTro_Depth).c_str()),            strdup( NTS(EFX_MUTROMOJO).c_str()),     strdup( NTS(MuTro_Depth).c_str()),            "0",     "1.0",
         "MuTroMojo Tempo",          strdup( NTS(MC_MuTro_LFO_Tempo).c_str()),        strdup( NTS(EFX_MUTROMOJO).c_str()),     strdup( NTS(MuTro_LFO_Tempo).c_str()),        "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "MuTroMojo Res",            strdup( NTS(MC_MuTro_Resonance).c_str()),        strdup( NTS(EFX_MUTROMOJO).c_str()),     strdup( NTS(MuTro_Resonance).c_str()),        "0",     "1.0",
@@ -402,7 +409,7 @@ RKR::MIDI_control()
         "Opticaltrem Depth",        strdup( NTS(MC_Optical_Depth).c_str()),          strdup( NTS(EFX_OPTICALTREM).c_str()),   strdup( NTS(Optical_Depth).c_str()),          "0",     "1.0",
         "Opticaltrem Tempo",        strdup( NTS(MC_Optical_LFO_Tempo).c_str()),      strdup( NTS(EFX_OPTICALTREM).c_str()),   strdup( NTS(Optical_LFO_Tempo).c_str()),      "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Opticaltrem Random",       strdup( NTS(MC_Optical_LFO_Random).c_str()),     strdup( NTS(EFX_OPTICALTREM).c_str()),   strdup( NTS(Optical_LFO_Random).c_str()),     "0",     "1.0",
-        "Opticaltrem LFO Type",     strdup( NTS(MC_Optical_LFO_Type).c_str()),       strdup( NTS(EFX_OPTICALTREM).c_str()),   strdup( NTS(Optical_LFO_Type).c_str()),       "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Opticaltrem LFO Type",     strdup( NTS(MC_Optical_LFO_Type).c_str()),       strdup( NTS(EFX_OPTICALTREM).c_str()),   strdup( NTS(Optical_LFO_Type).c_str()),       "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Opticaltrem Stereo Df",    strdup( NTS(MC_Optical_LFO_Stereo).c_str()),     strdup( NTS(EFX_OPTICALTREM).c_str()),   strdup( NTS(Optical_LFO_Stereo).c_str()),     "0",     "1.0",
         "Opticaltrem Pan",          strdup( NTS(MC_Optical_Pan).c_str()),            strdup( NTS(EFX_OPTICALTREM).c_str()),   strdup( NTS(Optical_Pan).c_str()),            "0",     "1.0",
 
@@ -421,7 +428,7 @@ RKR::MIDI_control()
         "Pan Pan",                  strdup( NTS(MC_Pan_Pan).c_str()),                strdup( NTS(EFX_PAN).c_str()),           strdup( NTS(Pan_Pan).c_str()),                "0",     "1.0",
         "Pan Tempo",                strdup( NTS(MC_Pan_LFO_Tempo).c_str()),          strdup( NTS(EFX_PAN).c_str()),           strdup( NTS(Pan_LFO_Tempo).c_str()),          "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Pan Random",               strdup( NTS(MC_Pan_LFO_Random).c_str()),         strdup( NTS(EFX_PAN).c_str()),           strdup( NTS(Pan_LFO_Random).c_str()),         "0",     "1.0",
-        "Pan LFO Type",             strdup( NTS(MC_Pan_LFO_Type).c_str()),           strdup( NTS(EFX_PAN).c_str()),           strdup( NTS(Pan_LFO_Type).c_str()),           "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Pan LFO Type",             strdup( NTS(MC_Pan_LFO_Type).c_str()),           strdup( NTS(EFX_PAN).c_str()),           strdup( NTS(Pan_LFO_Type).c_str()),           "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Pan Stereo Df",            strdup( NTS(MC_Pan_LFO_Stereo).c_str()),         strdup( NTS(EFX_PAN).c_str()),           strdup( NTS(Pan_LFO_Stereo).c_str()),         "0",     "1.0",
         "Pan E. Stereo",            strdup( NTS(MC_Pan_Ex_St_Amt).c_str()),          strdup( NTS(EFX_PAN).c_str()),           strdup( NTS(Pan_Ex_St_Amt).c_str()),          "0",     "1.0",
 
@@ -440,7 +447,7 @@ RKR::MIDI_control()
         "Phaser Pan",               strdup( NTS(MC_Phaser_Pan).c_str()),             strdup( NTS(EFX_PHASER).c_str()),        strdup( NTS(Phaser_Pan).c_str()),             "0",     "1.0",
         "Phaser Tempo",             strdup( NTS(MC_Phaser_LFO_Tempo).c_str()),       strdup( NTS(EFX_PHASER).c_str()),        strdup( NTS(Phaser_LFO_Tempo).c_str()),       "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Phaser Random",            strdup( NTS(MC_Phaser_LFO_Random).c_str()),      strdup( NTS(EFX_PHASER).c_str()),        strdup( NTS(Phaser_LFO_Random).c_str()),      "0",     "1.0",
-        "Phaser LFO Type",          strdup( NTS(MC_Phaser_LFO_Type).c_str()),        strdup( NTS(EFX_PHASER).c_str()),        strdup( NTS(Phaser_LFO_Type).c_str()),        "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Phaser LFO Type",          strdup( NTS(MC_Phaser_LFO_Type).c_str()),        strdup( NTS(EFX_PHASER).c_str()),        strdup( NTS(Phaser_LFO_Type).c_str()),        "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Phaser Phase",             strdup( NTS(MC_Phaser_Phase).c_str()),           strdup( NTS(EFX_PHASER).c_str()),        strdup( NTS(Phaser_Phase).c_str()),           "0",     "1.0",
         "Phaser Stereo Df",         strdup( NTS(MC_Phaser_LFO_Stereo).c_str()),      strdup( NTS(EFX_PHASER).c_str()),        strdup( NTS(Phaser_LFO_Stereo).c_str()),      "0",     "1.0",
         "Phaser Depth",             strdup( NTS(MC_Phaser_Depth).c_str()),           strdup( NTS(EFX_PHASER).c_str()),        strdup( NTS(Phaser_Depth).c_str()),           "0",     "1.0",
@@ -449,6 +456,15 @@ RKR::MIDI_control()
 
         "Program Change Table",     strdup( NTS(MC_Program_Table).c_str()),          strdup( NTS(EFX_MASTER).c_str()),        "0",                                 "0",     "1.0",
 
+        "ResSolution Dry/Wet",      strdup( NTS(MC_Ressol_DryWet).c_str()),          strdup( NTS(EFX_RESSOLUTION).c_str()),   strdup( NTS(Ressol_DryWet).c_str()),        "127",     "-1.0",
+        "ResSolution Tempo",        strdup( NTS(MC_Ressol_LFO_Tempo).c_str()),       strdup( NTS(EFX_RESSOLUTION).c_str()),   strdup( NTS(Ressol_LFO_Tempo).c_str()),       "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
+        "ResSolution P. Depth",     strdup( NTS(MC_Ressol_Depth).c_str()),           strdup( NTS(EFX_RESSOLUTION).c_str()),   strdup( NTS(Ressol_Depth).c_str()),           "0",     "1.0",
+        "ResSolution Width",        strdup( NTS(MC_Ressol_Width).c_str()),           strdup( NTS(EFX_RESSOLUTION).c_str()),   strdup( NTS(Ressol_Width).c_str()),           "0",     "1.0",
+        "ResSolution Feedback",     strdup( NTS(MC_Ressol_Feedback).c_str()),        strdup( NTS(EFX_RESSOLUTION).c_str()),   strdup( NTS(Ressol_Feedback).c_str()),        "0",     strdup( NTS(C_MC_128_RANGE).c_str()),
+        "ResSolution Mismatch",     strdup( NTS(MC_Ressol_Mismatch).c_str()),        strdup( NTS(EFX_RESSOLUTION).c_str()),   strdup( NTS(Ressol_Mismatch).c_str()),        "0",     "1.0",
+        "ResSolution Distortion",   strdup( NTS(MC_Ressol_Distortion).c_str()),      strdup( NTS(EFX_RESSOLUTION).c_str()),   strdup( NTS(Ressol_Distortion).c_str()),      "0",     "1.0",
+        "ResSolution Stereo Df.",   strdup( NTS(MC_Ressol_LFO_Stereo).c_str()),      strdup( NTS(EFX_RESSOLUTION).c_str()),   strdup( NTS(Ressol_LFO_Stereo).c_str()),      "0",     "1.0",
+        
         "Reverb Dry/Wet",           strdup( NTS(MC_Reverb_DryWet).c_str()),          strdup( NTS(EFX_REVERB).c_str()),        strdup( NTS(Reverb_DryWet).c_str()),        "127",     "-1.0",
         "Reverb Pan",               strdup( NTS(MC_Reverb_Pan).c_str()),             strdup( NTS(EFX_REVERB).c_str()),        strdup( NTS(Reverb_Pan).c_str()),             "0",     "1.0",
         "Reverb Time",              strdup( NTS(MC_Reverb_Time).c_str()),            strdup( NTS(EFX_REVERB).c_str()),        strdup( NTS(Reverb_Time).c_str()),            "0",     "1.0",
@@ -547,7 +563,7 @@ RKR::MIDI_control()
         "Synthfilter Distort",      strdup( NTS(MC_Synthfilter_Distort).c_str()),    strdup( NTS(EFX_SYNTHFILTER).c_str()),   strdup( NTS(Synthfilter_Distort).c_str()),    "0",     "1.0",
         "Synthfilter Tempo",        strdup( NTS(MC_Synthfilter_LFO_Tempo).c_str()),  strdup( NTS(EFX_SYNTHFILTER).c_str()),   strdup( NTS(Synthfilter_LFO_Tempo).c_str()),  "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Synthfilter Random",       strdup( NTS(MC_Synthfilter_LFO_Random).c_str()), strdup( NTS(EFX_SYNTHFILTER).c_str()),   strdup( NTS(Synthfilter_LFO_Random).c_str()), "0",     "1.0",
-        "Synthfilter LFO Type",     strdup( NTS(MC_Synthfilter_LFO_Type).c_str()),   strdup( NTS(EFX_SYNTHFILTER).c_str()),   strdup( NTS(Synthfilter_LFO_Type).c_str()),   "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Synthfilter LFO Type",     strdup( NTS(MC_Synthfilter_LFO_Type).c_str()),   strdup( NTS(EFX_SYNTHFILTER).c_str()),   strdup( NTS(Synthfilter_LFO_Type).c_str()),   "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Synthfilter Stereo Df",    strdup( NTS(MC_Synthfilter_LFO_Stereo).c_str()), strdup( NTS(EFX_SYNTHFILTER).c_str()),   strdup( NTS(Synthfilter_LFO_Stereo).c_str()), "0",     "1.0",
         "Synthfilter Width",        strdup( NTS(MC_Synthfilter_Width).c_str()),      strdup( NTS(EFX_SYNTHFILTER).c_str()),   strdup( NTS(Synthfilter_Width).c_str()),      "0",     "1.0",
         "Synthfilter Feedback",     strdup( NTS(MC_Synthfilter_Feedback).c_str()),   strdup( NTS(EFX_SYNTHFILTER).c_str()),   strdup( NTS(Synthfilter_Feedback).c_str()), "-64",     strdup( NTS(C_MC_128_RANGE).c_str()),
@@ -569,10 +585,10 @@ RKR::MIDI_control()
 
         "VaryBand Dry/Wet",         strdup( NTS(MC_VaryBand_DryWet).c_str()),        strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_DryWet).c_str()),      "127",     "-1.0",
         "VaryBand Tempo 1",         strdup( NTS(MC_VaryBand_LFO_Tempo_1).c_str()),   strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_LFO_Tempo_1).c_str()),   "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
-        "VaryBand LFO 1 Type",      strdup( NTS(MC_VaryBand_LFO_Type_1).c_str()),    strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_LFO_Type_1).c_str()),    "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "VaryBand LFO 1 Type",      strdup( NTS(MC_VaryBand_LFO_Type_1).c_str()),    strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_LFO_Type_1).c_str()),    "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "VaryBand St.df 1",         strdup( NTS(MC_VaryBand_LFO_Stereo_1).c_str()),  strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_LFO_Stereo_1).c_str()),  "0",     "1.0",
         "VaryBand Tempo 2",         strdup( NTS(MC_VaryBand_LFO_Tempo_2).c_str()),   strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_LFO_Tempo_2).c_str()),   "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
-        "VaryBand LFO 2 Type",      strdup( NTS(MC_VaryBand_LFO_Type_2).c_str()),    strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_LFO_Type_2).c_str()),    "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "VaryBand LFO 2 Type",      strdup( NTS(MC_VaryBand_LFO_Type_2).c_str()),    strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_LFO_Type_2).c_str()),    "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "VaryBand St.df 2",         strdup( NTS(MC_VaryBand_LFO_Stereo_2).c_str()),  strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_LFO_Stereo_2).c_str()),  "0",     "1.0",
         "VaryBand Cross 1",         strdup( NTS(MC_VaryBand_Cross_1).c_str()),       strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_Cross_1).c_str()),      "20",     strdup( NTS(C_MC_980_RANGE).c_str()),
         "VaryBand Cross 2",         strdup( NTS(MC_VaryBand_Cross_2).c_str()),       strdup( NTS(EFX_VARYBAND).c_str()),      strdup( NTS(VaryBand_Cross_2).c_str()),    "1000",     strdup( NTS(C_MC_7000_RANGE).c_str()),
@@ -583,7 +599,7 @@ RKR::MIDI_control()
         "Vibe Depth",               strdup( NTS(MC_Vibe_Depth).c_str()),             strdup( NTS(EFX_VIBE).c_str()),          strdup( NTS(Vibe_Depth).c_str()),             "0",     "1.0",
         "Vibe Tempo",               strdup( NTS(MC_Vibe_LFO_Tempo).c_str()),         strdup( NTS(EFX_VIBE).c_str()),          strdup( NTS(Vibe_LFO_Tempo).c_str()),         "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "Vibe Random",              strdup( NTS(MC_Vibe_LFO_Random).c_str()),        strdup( NTS(EFX_VIBE).c_str()),          strdup( NTS(Vibe_LFO_Random).c_str()),        "0",     "1.0",
-        "Vibe LFO Type",            strdup( NTS(MC_Vibe_LFO_Type).c_str()),          strdup( NTS(EFX_VIBE).c_str()),          strdup( NTS(Vibe_LFO_Type).c_str()),          "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "Vibe LFO Type",            strdup( NTS(MC_Vibe_LFO_Type).c_str()),          strdup( NTS(EFX_VIBE).c_str()),          strdup( NTS(Vibe_LFO_Type).c_str()),          "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "Vibe Stereo Df",           strdup( NTS(MC_Vibe_LFO_Stereo).c_str()),        strdup( NTS(EFX_VIBE).c_str()),          strdup( NTS(Vibe_LFO_Stereo).c_str()),        "0",     "1.0",
         "Vibe Feedback",            strdup( NTS(MC_Vibe_Feedback).c_str()),          strdup( NTS(EFX_VIBE).c_str()),          strdup( NTS(Vibe_Feedback).c_str()),          "0",     strdup( NTS(C_MC_128_RANGE).c_str()),
         "Vibe L/R Cross",           strdup( NTS(MC_Vibe_LR_Cross).c_str()),          strdup( NTS(EFX_VIBE).c_str()),          strdup( NTS(Vibe_LR_Cross).c_str()),          "0",     strdup( NTS(C_MC_128_RANGE).c_str()),
@@ -601,7 +617,7 @@ RKR::MIDI_control()
         "WahWah Pan",               strdup( NTS(MC_WahWah_Pan).c_str()),             strdup( NTS(EFX_WAHWAH).c_str()),        strdup( NTS(WahWah_Pan).c_str()),             "0",     "1.0",
         "WahWah Tempo",             strdup( NTS(MC_WahWah_LFO_Tempo).c_str()),       strdup( NTS(EFX_WAHWAH).c_str()),        strdup( NTS(WahWah_LFO_Tempo).c_str()),       "1",     strdup( NTS(C_MC_600_RANGE).c_str()),
         "WahWah Random",            strdup( NTS(MC_WahWah_LFO_Random).c_str()),      strdup( NTS(EFX_WAHWAH).c_str()),        strdup( NTS(WahWah_LFO_Random).c_str()),      "0",     "1.0",
-        "WahWah LFO Type",          strdup( NTS(MC_WahWah_LFO_Type).c_str()),        strdup( NTS(EFX_WAHWAH).c_str()),        strdup( NTS(WahWah_LFO_Type).c_str()),        "0",     strdup( NTS(C_MC_11_RANGE).c_str()),
+        "WahWah LFO Type",          strdup( NTS(MC_WahWah_LFO_Type).c_str()),        strdup( NTS(EFX_WAHWAH).c_str()),        strdup( NTS(WahWah_LFO_Type).c_str()),        "0",     strdup( NTS(C_MC_LFO_RNGE).c_str()),
         "WahWah Stereo Df",         strdup( NTS(MC_WahWah_LFO_Stereo).c_str()),      strdup( NTS(EFX_WAHWAH).c_str()),        strdup( NTS(WahWah_LFO_Stereo).c_str()),      "0",     "1.0",
         "WahWah Depth",             strdup( NTS(MC_WahWah_Depth).c_str()),           strdup( NTS(EFX_WAHWAH).c_str()),        strdup( NTS(WahWah_Depth).c_str()),           "0",     "1.0",
         "WahWah Amp S.",            strdup( NTS(MC_WahWah_Sense).c_str()),           strdup( NTS(EFX_WAHWAH).c_str()),        strdup( NTS(WahWah_Sense).c_str()),           "0",     "1.0",
@@ -613,7 +629,7 @@ RKR::MIDI_control()
     // C_MC_PARAMETER_SIZE must be adjusted.
     for (int i = 0; i < C_MC_PARAMETER_SIZE; i++)
     {
-        strcpy(mc_efx_params[i].Description, los_params[i * 6]);
+        RKRP::strlcpy(mc_efx_params[i].Description, los_params[i * 6], sizeof(mc_efx_params[i].Description));
         sscanf(los_params[i * 6 + 1], "%d", &mc_efx_params[i].MC_params_index);
         sscanf(los_params[i * 6 + 2], "%d", &mc_efx_params[i].Effect_index);
         sscanf(los_params[i * 6 + 3], "%d", &mc_efx_params[i].Efx_param_index);
@@ -636,6 +652,7 @@ RKR::ConnectMIDI()
 void
 RKR::InitMIDI()
 {
+#ifndef RKR_PLUS_LV2
     // Open Alsa Seq
     int err = snd_seq_open(&midi_in, "default", SND_SEQ_OPEN_INPUT, 0);
     if (err < 0)
@@ -646,17 +663,18 @@ RKR::InitMIDI()
     char portname[70];
 
     // Create Alsa Seq Client
-    sprintf(portname, "%s IN", jackcliname);
+    snprintf(portname, sizeof(portname), "%s IN", jackcliname);
     snd_seq_create_simple_port(midi_in, portname,
                                SND_SEQ_PORT_CAP_WRITE |
                                SND_SEQ_PORT_CAP_SUBS_WRITE,
                                SND_SEQ_PORT_TYPE_SYNTH);
-
+#endif
 }
 
 void
 RKR::miramidi()
 {
+#ifndef RKR_PLUS_LV2
     if (snd_seq_event_input_pending(midi_in, 1))
     {
         do
@@ -665,11 +683,13 @@ RKR::miramidi()
         }
         while (snd_seq_event_input_pending(midi_in, 0));
     }
+#endif
 }
 
 void
 RKR::midievents()
 {
+#ifndef RKR_PLUS_LV2
     int i;
     snd_seq_event_t *midievent;
     midievent = NULL;
@@ -887,6 +907,7 @@ RKR::midievents()
         parse_sysex();
     }
 #endif // SYSEX_SUPPORT
+#endif // #ifndef RKR_PLUS_LV2
 }
 
 void
@@ -927,9 +948,9 @@ RKR::ActiveUn(int value)
         Mnumeff[OnOffC] = 2000 + numef;
     }
     
-    if(miraque < C_NUMBER_EFFECTS)
+    if(miraque < EFX_NUMBER_EFFECTS)
     {
-        for(int i = 0; i < C_NUMBER_EFFECTS; i++)
+        for(int i = 0; i < EFX_NUMBER_EFFECTS; i++)
         {
             if(miraque == i)
             {
@@ -966,9 +987,9 @@ RKR::ActiveUn(int value)
 int
 RKR::checkonoff(int miraque)
 {
-    if(miraque < C_NUMBER_EFFECTS)
+    if(miraque < EFX_NUMBER_EFFECTS)
     {
-        for(int i = 0; i < C_NUMBER_EFFECTS; i++)
+        for(int i = 0; i < EFX_NUMBER_EFFECTS; i++)
         {
             if(miraque == i)
             {
@@ -1026,7 +1047,7 @@ RKR::Conecta()
         {
             if (strstr(temp, "Client") != NULL)
             {
-                strcpy(temp1, temp);
+                RKRP::strlcpy(temp1, temp, sizeof(temp1));
                 strtok(temp1, " ");
                 nume = strtok(NULL, "\"");
                 sscanf(nume, "%d", &client);
@@ -1034,13 +1055,13 @@ RKR::Conecta()
 
             if (strstr(temp, "Port") != NULL)
             {
-                strcpy(temp2, temp);
+                RKRP::strlcpy(temp2, temp, sizeof(temp2));
                 strtok(temp2, " ");
                 nume = strtok(NULL, "  ");
                 sscanf(nume, "%d", &puerto);
                 
                 std::string s_name = jackcliname;
-                s_name + " IN";
+                s_name += " IN";
                 
                 if (strstr(temp, s_name.c_str()) != 0)
                 {
@@ -1069,7 +1090,7 @@ RKR::conectaaconnect()
     {
         char tempi[128];
         memset(tempi, 0, sizeof (tempi));
-        sprintf(tempi, "aconnect %d:%d  %d:%d", Ccin, Pcin, Cyoin, Pyoin);
+        snprintf(tempi, sizeof(tempi), "aconnect %d:%d  %d:%d", Ccin, Pcin, Cyoin, Pyoin);
         
         if (system(tempi) == -1)
         {
@@ -1087,7 +1108,7 @@ RKR::disconectaaconnect()
     {
         char tempi[128];
         memset(tempi, 0, sizeof (tempi));
-        sprintf(tempi, "aconnect -d %d:%d  %d:%d", Ccin, Pcin, Cyoin, Pyoin);
+        snprintf(tempi, sizeof(tempi), "aconnect -d %d:%d  %d:%d", Ccin, Pcin, Cyoin, Pyoin);
         if (system(tempi) == -1)
         {
             Handle_Message(29);
@@ -1097,12 +1118,14 @@ RKR::disconectaaconnect()
     }
 }
 
+#ifndef RKR_PLUS_LV2
 void
 RKR::jack_process_midievents(jack_midi_event_t *midievent)
 {
     int i;
     int type = midievent->buffer[0] >> 4;
 
+    // 0xf8 is MIDI message clock
     if ((Tap_Active) && (Tap_Selection == 3) && (midievent->buffer[0] == 0xf8))
     {
         mtc_counter++;
@@ -1114,6 +1137,7 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
         }
     }
 
+    // Note ON and Note OFF
     if ((type == 8) || (type == 9))
     {
         int cmdnote = midievent->buffer[1];
@@ -1126,6 +1150,7 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
         {
             for (i = 0; i < POLY; i++)
             {
+                // Note ON with > 0 velocity
                 if ((type == 9) && (cmdvelo != 0))
                 {
                     if (RC_Harm->note_active[i] == 0)
@@ -1138,6 +1163,7 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
                     }
                 }
 
+                // Note ON with zero velocity, treat as note OFF
                 if ((type == 9) && (cmdvelo == 0))
                 {
                     if ((RC_Harm->note_active[i]) && (RC_Harm->rnote[i] == cmdnote))
@@ -1148,6 +1174,7 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
                     }
                 }
 
+                // Note OFF
                 if (type == 8)
                 {
                     if ((RC_Harm->note_active[i]) && (RC_Harm->rnote[i] == cmdnote))
@@ -1164,6 +1191,7 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
         {
             for (i = 0; i < POLY; i++)
             {
+                // Note ON with > 0 velocity
                 if ((type == 9) && (cmdvelo != 0))
                 {
                     if (RC_Stereo_Harm->note_active[i] == 0)
@@ -1176,6 +1204,7 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
                     }
                 }
 
+                // Note ON with zero velocity, treat as note OFF
                 if ((type == 9) && (cmdvelo == 0))
                 {
                     if ((RC_Stereo_Harm->note_active[i]) && (RC_Stereo_Harm->rnote[i] == cmdnote))
@@ -1186,6 +1215,7 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
                     }
                 }
 
+                // Note OFF
                 if (type == 8)
                 {
                     if ((RC_Stereo_Harm->note_active[i]) && (RC_Stereo_Harm->rnote[i] == cmdnote))
@@ -1199,6 +1229,7 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
         }
     }
 
+    // Program Change
     if (type == 12)
     {
         int cmdvalue = midievent->buffer[1];
@@ -1225,6 +1256,7 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
         }
     }
 
+    // Control Change
     if (type == 11)
     {
         int cmdcontrol = midievent->buffer[1];
@@ -1264,6 +1296,272 @@ RKR::jack_process_midievents(jack_midi_event_t *midievent)
         append_sysex(midievent->buffer, midievent->size);
         parse_sysex();
     }
+#endif
+}
+#endif  // #ifndef RKR_PLUS_LV2
+
+#ifdef RKR_PLUS_LV2
+static void* check_program_change(void * _RKR)
+{
+    RKR * rkr = (RKR *) _RKR;
+
+    while (rkr->Exit_Program)
+    {
+        if (rkr->Change_Preset != C_CHANGE_PRESET_OFF)
+        {
+            if ((rkr->Change_Preset > 0) && (rkr->Change_Preset < 61))
+            {
+                rkr->active_bank_preset_to_main_window(rkr->Change_Preset);
+
+                // reset these if volume changed from preset
+                rkr->calculavol(1);
+                rkr->calculavol(2);
+                rkr->booster = 1.0f;
+            }
+
+            // hold the preset number so we can update the bank window highlight TODO
+            rkr->hold_preset = rkr->Change_Preset;
+            rkr->Change_Preset = C_CHANGE_PRESET_OFF;
+        }
+        usleep(1500);
+    }
+
+    return 0;
+}
+
+void
+RKR::lv2_process_midi_program_changes()
+{
+    Exit_Program = 1;
+    int result = pthread_create(&t_pgm, nullptr, check_program_change, this);
+    if(result != 0)
+    {
+        Handle_Message (52, "pthread_create - at lv2_process_midi_program_changes().");
+    }
+}
+
+void
+RKR::lv2_join_thread()
+{
+    Exit_Program = 0;
+    if(t_pgm)
+    {
+        int result = pthread_join(t_pgm, nullptr);
+        if(result != 0)
+        {
+            Handle_Message (52, "pthread_join - at lv2_join_thread().");
+        }
+    }
+}
+#endif
+
+void
+RKR::lv2_process_midievents(const uint8_t* const msg)
+{
+#ifdef RKR_PLUS_LV2
+
+    if ((Tap_Active) && (Tap_Selection == 3) && (msg[0] == LV2_MIDI_MSG_CLOCK))
+    {
+        mtc_counter++;
+
+        if (mtc_counter >= 24)
+        {
+            Tap_TempoSet = TapTempo();
+            mtc_counter = 0;
+        }
+    }
+
+    int i;
+    uint8_t statusByte = msg[0];
+    int channel = 0;
+    if ((statusByte & 0xF0) >= 0x80 && (statusByte & 0xF0) <= 0xEF)
+    {
+        channel = statusByte & 0x0F; // Extract channel from the status byte
+       // printf("Channel = %d\n", channel);
+    }
+
+    switch (lv2_midi_message_type(msg))
+    {
+        case LV2_MIDI_MSG_NOTE_ON:
+        {
+            //printf("NOTE ON - msg[0] %hhu: NOTE-msg[1] %hhu: VELOCITY-msg[2] %hhu\n", msg[0], msg[1], msg[2]);
+            // Set tap tempo based on any note on
+            if ((Tap_Active) && (Tap_Selection == 1) &&  (msg[2] != 0))
+                Tap_TempoSet = TapTempo();
+
+            if (channel == Config.Harmonizer_MIDI_Channel)
+            {
+                for (i = 0; i < POLY; i++)
+                {
+                    // Note ON with > 0 velocity
+                    if (msg[2] != 0)
+                    {
+                        if (RC_Harm->note_active[i] == 0)
+                        {
+                            RC_Harm->note_active[i] = 1;
+                            RC_Harm->rnote[i] = msg[1];
+                            RC_Harm->gate[i] = 1;
+                            RC_Harm->MiraChord();
+                            break;
+                        }
+                    }
+
+                    // Note ON with zero velocity, treat as note OFF
+                    if (msg[2] == 0)
+                    {
+                        if ((RC_Harm->note_active[i]) && (RC_Harm->rnote[i] == msg[1]))
+                        {
+                            RC_Harm->note_active[i] = 0;
+                            RC_Harm->gate[i] = 0;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (channel == Config.StereoHarm_MIDI_Channel)
+            {
+                for (i = 0; i < POLY; i++)
+                {
+                    // Note ON with > 0 velocity
+                    if (msg[2] != 0)
+                    {
+                        if (RC_Stereo_Harm->note_active[i] == 0)
+                        {
+                            RC_Stereo_Harm->note_active[i] = 1;
+                            RC_Stereo_Harm->rnote[i] = msg[1];
+                            RC_Stereo_Harm->gate[i] = 1;
+                            RC_Stereo_Harm->MiraChord();
+                            break;
+                        }
+                    }
+
+                    // Note ON with zero velocity, treat as note OFF
+                    if (msg[2] == 0)
+                    {
+                        if ((RC_Stereo_Harm->note_active[i]) && (RC_Stereo_Harm->rnote[i] == msg[1]))
+                        {
+                            RC_Stereo_Harm->note_active[i] = 0;
+                            RC_Stereo_Harm->gate[i] = 0;
+                            break;
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        case LV2_MIDI_MSG_NOTE_OFF:
+        {
+           // printf("NOTE OFF - msg[0] %hhu: msg[1] %hhu: msg[2] %hhu\n", msg[0], msg[1], msg[2]);
+            if (channel == Config.Harmonizer_MIDI_Channel)
+            {
+                for (i = 0; i < POLY; i++)
+                {
+                    if ((RC_Harm->note_active[i]) && (RC_Harm->rnote[i] == msg[1]))
+                    {
+                        RC_Harm->note_active[i] = 0;
+                        RC_Harm->gate[i] = 0;
+                        break;
+                    }
+                }
+            }
+            if (channel == Config.StereoHarm_MIDI_Channel)
+            {
+                for (i = 0; i < POLY; i++)
+                {
+                    if ((RC_Stereo_Harm->note_active[i]) && (RC_Stereo_Harm->rnote[i] == msg[1]))
+                    {
+                        RC_Stereo_Harm->note_active[i] = 0;
+                        RC_Stereo_Harm->gate[i] = 0;
+                        break;
+                    }
+                }
+            }
+            break;
+        }
+        case LV2_MIDI_MSG_PGM_CHANGE:
+        {
+//            printf("Program change %hhu\n", msg[1]);
+            int cmdvalue = msg[1];
+
+            if (channel == Config.MIDI_In_Channel)
+            {
+                if (!Config.custom_midi_table)
+                {
+                    if ((cmdvalue > 0)
+                        && (cmdvalue < 61))
+                        Change_Preset = cmdvalue;
+
+                    if (cmdvalue == 81) if (Selected_Preset > 1) Change_Preset = Selected_Preset - 1;
+
+                    if (cmdvalue == 82) if (Selected_Preset < 60) Change_Preset = Selected_Preset + 1;
+                }
+                else
+                {
+                    int bank = MIDI_Table[cmdvalue].bank;
+                    int preset = MIDI_Table[cmdvalue].preset + 1;
+                    process_midi_controller_events(0, bank, preset);    // 0 is CC 0 Bank Select
+                }
+            }
+
+            break;
+        }
+        case LV2_MIDI_MSG_CONTROLLER:
+        {
+ //           printf("Got CC %hhu: Control Change %hhu: Value %hhu\n", msg[0], msg[1], msg[2]);
+
+            int cmdcontrol = msg[1];
+            int cmdvalue = msg[2];
+
+            if (channel == Config.MIDI_In_Channel)
+            {
+                if (RControl)
+                {
+                    ControlGet = cmdcontrol;
+                    return;
+                }
+
+                // Bank_Select = CC 0
+                if(cmdcontrol == 0)
+                {
+                    process_midi_controller_events(cmdcontrol, cmdvalue);
+                }
+                else if (Config.MIDIway)
+                {
+                    for (i = 0; i < 20; i++)
+                    {
+                        if (Active_Preset.XUserMIDI[cmdcontrol][i])
+                            process_midi_controller_events(Active_Preset.XUserMIDI[cmdcontrol][i], cmdvalue);
+                        else break;
+                    }
+                }
+                else
+                    process_midi_controller_events(cmdcontrol, cmdvalue);
+            }
+            break;
+        }
+
+        default: break;
+    }
+
+#endif  // #ifdef RKR_PLUS_LV2
+}
+
+void
+RKR::lv2_set_bpm(float a_bpm)
+{
+#ifdef RKR_PLUS_LV2
+    // no need to check active and selection here since it is done already before
+    // it is sent.
+//    if ((Tap_Active) && (Tap_Selection == 2))
+//    {
+        if ((a_bpm > 19) && (a_bpm < 360) && (a_bpm != Tap_TempoSet))
+        {
+            Tap_TempoSet = a_bpm;
+            Update_tempo();
+            Tap_Display = 1;
+        }
+//    }
 #endif
 }
 
@@ -1502,7 +1800,7 @@ void RKR::sysex_save_preset()
     
     // Set the preset name for the active preset
     memset(Active_Preset.Preset_Name, 0, sizeof (char) * 64);
-    strcpy(Active_Preset.Preset_Name, m_preset_name.c_str());
+    RKRP::strlcpy(Active_Preset.Preset_Name, m_preset_name.c_str(), sizeof(Active_Preset.Preset_Name));
     
     // Copy the active preset to the save bank
     Save_Bank[m_preset_number] = Active_Preset;

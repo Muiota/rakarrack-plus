@@ -30,11 +30,12 @@
 #include <unistd.h>
 #include "global.h"
 #include "process.h"
+#include "strlcpy.h"
 
 int global_error_number = 0;
 char *jack_client_name = (char*) PACKAGE;
 
-RKR::RKR(int gui) :
+RKR::RKR(uint32_t _sample_rate, uint32_t _period, int gui) :
     efx_Tuner(NULL),
     efx_MIDIConverter(NULL),
     M_Metronome(NULL),
@@ -52,8 +53,6 @@ RKR::RKR(int gui) :
     DC_Offsetl(NULL),
     DC_Offsetr(NULL),
     jackclient(NULL),
-    options(),
-    status(),
     jackcliname(),
     Jack_Shut_Down(0),
     db6booster(),
@@ -64,8 +63,14 @@ RKR::RKR(int gui) :
     Tap_Active(0),
     ACI_Active(0),
     Exit_Program(0),
+    Re_init_in_progress(0),
+    sco_anal_need_init(false),
+    need_bogomips_message(false),
+    handle_bogomips_message(false),
+    lv2_is_active(false),
     Selected_Preset(1),
     Change_Preset(C_CHANGE_PRESET_OFF),
+    hold_preset(C_CHANGE_PRESET_OFF),
     Change_Bank(C_BANK_CHANGE_OFF),
     Change_MIDI_Table(C_BANK_CHANGE_OFF),
     Command_Line_File(0),
@@ -73,7 +78,6 @@ RKR::RKR(int gui) :
     Gui_Shown(gui),
     Gui_Refresh(0),
     Shut_Off_Below_Mouse(0),
-    No_Jack_Client(0),
     Bank_Load_Command_Line(0),
     saved_order(),
     efx_order(),
@@ -102,11 +106,10 @@ RKR::RKR(int gui) :
     m_displayed(),
     Mvalue(),
     Mnumeff(),
-    OnOffC(),
-    JACK_SAMPLE_RATE(),
-    JACK_PERIOD(),
+    OnOffC(0),
+    JACK_SAMPLE_RATE(_sample_rate),
+    JACK_PERIOD(_period),
     period_master(),
-    fPeriod(),
     sample_rate(),
     fSample_rate(),
     cSample_rate(),
@@ -163,6 +166,10 @@ RKR::RKR(int gui) :
     timeA(),
     booster(),
     cpuload(),
+#ifdef RKR_PLUS_LV2
+    input_l(NULL),
+    input_r(NULL),
+#endif
     efxoutl(NULL),
     efxoutr(NULL),
     auxdata(NULL),
@@ -197,8 +204,10 @@ RKR::RKR(int gui) :
     mc_efx_params(),
     Bank(),
     MIDI_Table(),
-    MIDI_Table_Bank_Preset_Names(),
-    midi_in(NULL)
+    MIDI_Table_Bank_Preset_Names()
+#ifndef RKR_PLUS_LV2
+    ,midi_in(NULL)
+#endif
 #ifdef SYSEX_SUPPORT
     ,m_have_sysex_message(0),
     m_preset_name(),
@@ -206,12 +215,34 @@ RKR::RKR(int gui) :
     m_preset_number(0)
 #endif
 {
-    if(!jack_open_client())
-    {
-        return; // If we don't have a jack client then quit with message
-    }
-
-    load_user_preferences();
+}
+/**
+ * Instantiate all effects, buffers, arrays, etc.
+ * 
+ * @param re_initialize
+ *      For some changes in user preferences such as master up-sampling we
+ *      need to re-initialize everything or quit and restart which was the 
+ *      legacy method. With re_initialize, the initialize function was previously
+ *      run, and now to avoid restarting, we delete all the necessary objects, etc
+ *      the re-run initialize with re-initialize = true. Currently only used by LV2
+ *      on state restore to allow for each instance to have independent preferences.
+ */
+void
+RKR::initialize(bool re_initialize)
+{
+    if(!re_initialize)
+        load_user_preferences();
+    
+#ifdef RKR_PLUS_LV2
+    if(Config.booster == 1.0)
+        booster = 1.0f;
+    else
+        booster = dB2rap(10);
+    
+    FX_Master_Active_Reset = Config.init_state; // Always ON for LV2
+#endif
+    upsample = Config.upsample;
+    Adjust_Upsample();
 
     Get_Bogomips();
 
@@ -219,44 +250,62 @@ RKR::RKR(int gui) :
 
     instantiate_effects();
 
-    put_order_in_rack();
+    if(!re_initialize)
+    {
+        put_order_in_rack();
+
+        MIDI_control();
     
-    MIDI_control();
+        // Initialize Preset
+        new_preset();
+
+        // Initialize Bank
+        new_bank(Bank);
     
-    // Initialize Preset
-    new_preset();
+        // Loads all Banks, default and any in Settings/Preferences/Bank - User Directory
+        load_bank_vector();
 
-    // Initialize Bank
-    new_bank(Bank);
-    
-    // Loads all Banks, default and any in Settings/Preferences/Bank - User Directory
-    load_bank_vector();
+        // Custom MIDI table file loading
+        load_MIDI_table_vector();
 
-    // Custom MIDI table file loading
-    load_MIDI_table_vector();
+        // Either default or last used table
+        load_default_midi_table();
 
-    // Either default or last used table
-    load_default_midi_table();
+        // The Preset scroll items in Settings/Preferences/Midi - MIDI Program Change Table
+        load_custom_MIDI_table_preset_names();
 
-    // The Preset scroll items in Settings/Preferences/Midi - MIDI Program Change Table
-    load_custom_MIDI_table_preset_names();
+        // Related user files in User Directory
+        load_convolotron_vector();
+        load_echotron_vector();
+        load_reverbtron_vector();
+    }
 
-    // Related user files in User Directory
-    load_convolotron_vector();
-    load_echotron_vector();
-    load_reverbtron_vector();
+#ifdef RKR_PLUS_LV2
+    active_bank = Config.active_bank;
+    if(active_bank < (int) Bank_Vector.size())
+        copy_bank(Bank, Bank_Vector[active_bank].Bank);
+
+    if(!re_initialize)
+        lv2_process_midi_program_changes(); // this closes the GUI for LV2
+#else
+    if (!Bank_Load_Command_Line && !Gui_Shown)
+    {
+        active_bank = Config.active_bank;
+        if(active_bank < (int) Bank_Vector.size())
+            copy_bank(Bank, Bank_Vector[active_bank].Bank);
+    }
+#endif
 }
 
-RKR::~RKR()
+void
+RKR::delete_everything()
 {
-    /* To clean up valgrind log */
-
     delete DC_Offsetl;
     delete DC_Offsetr;
     delete M_Metronome;
     delete efx_FLimiter;
     
-    for(int i = 0; i < C_NUMBER_EFFECTS; i++)
+    for(int i = 0; i < EFX_NUMBER_EFFECTS; i++)
     {
         if(Rack_Effects[i])
             delete Rack_Effects[i];
@@ -274,55 +323,96 @@ RKR::~RKR()
     delete RingRecNote;
     delete RC_Harm;
     delete RC_Stereo_Harm;
-
+#ifdef RKR_PLUS_LV2
+    free(input_l);
+    input_l = NULL;
+    free(input_r);
+    input_r = NULL;
+#endif
     free(efxoutl);
+    efxoutl = NULL;
     free(efxoutr);
+    efxoutr = NULL;
     free(auxdata);
+    auxdata = NULL;
     free(auxresampled);
+    auxresampled = NULL;
     free(anall);
+    anall = NULL;
     free(analr);
+    analr = NULL;
     free(smpl);
+    smpl = NULL;
     free(smpr);
+    smpr = NULL;
     free(m_ticks);
+    m_ticks = NULL;
     free(interpbuf);
+    interpbuf = NULL;
+}
 
-    // alsa
-    if(midi_in)
+void 
+RKR::reset_all_effects(bool need_state_restore)
+{
+    std::string s_buf;
+    if(need_state_restore)
+        rkr_save_state(s_buf);
+
+    quality_update = true;
+    usleep(C_MILLISECONDS_25);
+
+    delete_everything();
+
+    /* Wait a bit */
+    usleep(C_MILLISECONDS_300);
+
+    initialize(true);   // true is re-initialize
+
+    /* Wait for things to complete */
+    usleep(C_MILLISECONDS_300);
+
+    if(need_state_restore)
+        rkr_restore_state(s_buf);
+
+    quality_update = false;
+}
+
+RKR::~RKR()
+{
+// The thread needs to be joined before deleting or it may invoke processing on
+// a deleted item.
+#ifdef RKR_PLUS_LV2
+    lv2_join_thread();
+    usleep(2000);   // We seem to need to wait a bit for the thread to finish...
+#endif
+
+    delete_everything();
+
+#ifndef RKR_PLUS_LV2
+    if(midi_in)     // alsa
     {
         snd_seq_close(midi_in);
     }
+#endif
 };
 
-/**
- *  Opens a jack client for this session.
- * 
- * @return 
- *      0 if client cannot be opened.
- *      1 if valid client is opened.
- */
-int
-RKR::jack_open_client()
+#ifdef RKR_PLUS_LV2
+void
+RKR::set_client_name(std::string s_name)
 {
-    char temp[256];
-    sprintf(temp, "%s", jack_client_name);
-
-    jackclient = jack_client_open(temp, options, &status, NULL);
-
-    if (jackclient == NULL)
-    {
-        fprintf(stderr, "Cannot make a jack client, is jackd running?\n");
-        No_Jack_Client = 1;
-        return 0;
-    }
-
-    strcpy(jackcliname, jack_get_client_name(jackclient));
-    strcpy(Config.jackcliname, jack_get_client_name(jackclient));
-
-    JACK_SAMPLE_RATE = jack_get_sample_rate(jackclient);
-    JACK_PERIOD = jack_get_buffer_size(jackclient);
-    
-    return 1;
+    RKRP::strlcpy(jackcliname, s_name.c_str(), sizeof(jackcliname));
+    RKRP::strlcpy(Config.jackcliname, s_name.c_str(), sizeof(Config.jackcliname));
 }
+#else
+void
+RKR::set_jack_client(jack_client_t *_jackclient)
+{
+    jackclient = _jackclient;
+
+    RKRP::strlcpy(jackcliname, jack_get_client_name(jackclient), sizeof(jackcliname));
+    RKRP::strlcpy(Config.jackcliname, jack_get_client_name(jackclient), sizeof(Config.jackcliname));
+}
+#endif
 
 /**
  *  Loads the user preferences set in the Settings/Preferences tabs:
@@ -341,8 +431,6 @@ void
 RKR::load_user_preferences()
 {
     Config.load_previous_state();
-    upsample = Config.upsample;
-    Adjust_Upsample();
 }
 
 void
@@ -400,6 +488,7 @@ RKR::instantiate_effects()
     Rack_Effects[EFX_OPTICALTREM] = new Opticaltrem(fSample_rate, period_master);
     Rack_Effects[EFX_VIBE] = new Vibe(fSample_rate, period_master);
     Rack_Effects[EFX_INFINITY] = new Infinity(fSample_rate, period_master);
+    Rack_Effects[EFX_RESSOLUTION] = new ResSolution(fSample_rate, period_master);
 
     U_Resample = new Resample(Config.UpQual);
     D_Resample = new Resample(Config.DownQual);
@@ -422,7 +511,7 @@ RKR::instantiate_effects()
     StHarmRecNote->reconota = -1;
     RingRecNote->reconota = -1;
     
-    for (int i = 0; i < C_NUMBER_EFFECTS; i++)
+    for (int i = 0; i < EFX_NUMBER_EFFECTS; i++)
     {
         EFX_Param_Size[i] = Rack_Effects[i]->get_number_efx_parameters();
     }
@@ -431,6 +520,10 @@ RKR::instantiate_effects()
 void
 RKR::initialize_arrays()
 {
+#ifdef RKR_PLUS_LV2
+    input_l = (float *) malloc(sizeof (float) * period_master);
+    input_r = (float *) malloc(sizeof (float) * period_master);
+#endif
     efxoutl = (float *) malloc(sizeof (float) * period_master);
     efxoutr = (float *) malloc(sizeof (float) * period_master);
 
@@ -446,7 +539,10 @@ RKR::initialize_arrays()
     m_ticks = (float *) malloc(sizeof (float) * period_master);
 
     interpbuf = (float*) malloc(sizeof (float)* period_master);
-
+#ifdef RKR_PLUS_LV2
+    memset(input_l, 0, sizeof (float)*period_master);
+    memset(input_r, 0, sizeof (float)*period_master);
+#endif
     memset(efxoutl, 0, sizeof (float)*period_master);
     memset(efxoutr, 0, sizeof (float)*period_master);
 
@@ -461,7 +557,6 @@ RKR::initialize_arrays()
 
     memset(m_ticks, 0, sizeof (float)*period_master);
     memset(interpbuf, 0, sizeof (float)*period_master);
-
 }
 
 /**
@@ -504,6 +599,7 @@ RKR::put_order_in_rack()
         "Pan", strdup( NTS(EFX_PAN).c_str()), strdup( NTS(Type_Processing_and_EQ).c_str()),
         "Parametric EQ", strdup( NTS(EFX_PARAMETRIC).c_str()), strdup( NTS(Type_Processing_and_EQ).c_str()),
         "Phaser", strdup( NTS(EFX_PHASER).c_str()), strdup( NTS(Type_Modulation).c_str()),
+        "ResSolution", strdup( NTS(EFX_RESSOLUTION).c_str()), strdup( NTS(Type_Modulation).c_str()),
         "Reverb", strdup( NTS(EFX_REVERB).c_str()), strdup( NTS(Type_Time).c_str()),
         "Reverbtron", strdup( NTS(EFX_REVERBTRON).c_str()), strdup( NTS(Type_Time).c_str()),
         "Ring", strdup( NTS(EFX_RING).c_str()), strdup( NTS(Type_Synthesis).c_str()),
@@ -519,12 +615,12 @@ RKR::put_order_in_rack()
         "VaryBand", strdup( NTS(EFX_VARYBAND).c_str()), strdup( NTS(Type_Modulation).c_str()),
         "Vibe", strdup( NTS(EFX_VIBE).c_str()), strdup( NTS(Type_Modulation).c_str()),
         "Vocoder", strdup( NTS(EFX_VOCODER).c_str()), strdup( NTS(Type_Synthesis).c_str()),
-        "WahWah", strdup( NTS(EFX_WAHWAH).c_str()), strdup( NTS(Type_Filters).c_str()),
+        "WahWah", strdup( NTS(EFX_WAHWAH).c_str()), strdup( NTS(Type_Filters).c_str())
     };
 
-    for (int i = 0; i < C_NUMBER_EFFECTS * 3; i += 3)
+    for (int i = 0; i < EFX_NUMBER_EFFECTS * 3; i += 3)
     {
-        strcpy(efx_names[i / 3].Nom, los_names[i]);
+        RKRP::strlcpy(efx_names[i / 3].Nom, los_names[i], sizeof(efx_names[i / 3].Nom));
         sscanf(los_names[i + 1], "%d", &efx_names[i / 3].Pos);
         sscanf(los_names[i + 2], "%d", &efx_names[i / 3].Type);
     }
@@ -578,7 +674,6 @@ RKR::Adjust_Upsample()
 
     fSample_rate = (float) sample_rate;
     cSample_rate = 1.0f / (float) sample_rate;
-    fPeriod = float(period_master);
     t_periods = JACK_SAMPLE_RATE / 12 / JACK_PERIOD;
 
 }
@@ -630,7 +725,11 @@ RKR::Control_Gain(float *origl, float *origr)
 
     if (upsample)
     {
+#ifdef RKR_PLUS_LV2
+        U_Resample->out(input_l, input_r, efxoutl, efxoutr, JACK_PERIOD, u_up);
+#else
         U_Resample->out(origl, origr, efxoutl, efxoutr, JACK_PERIOD, u_up);
+#endif
         if ((checkforaux()) || (ACI_Active))
         {
             A_Resample->mono_out(auxdata, auxresampled, JACK_PERIOD, u_up, period_master);
@@ -754,19 +853,24 @@ RKR::Control_Volume(const float *origl, const float *origr)
 
         if (Active_Preset.Fraction_Bypass < 1.0f)
         { // FX% main window
+#ifdef RKR_PLUS_LV2
+            efxoutl[i] = (input_l[i] * (1.0f - Active_Preset.Fraction_Bypass) + efxoutl[i] * Active_Preset.Fraction_Bypass);
+            efxoutr[i] = (input_r[i] * (1.0f - Active_Preset.Fraction_Bypass) + efxoutr[i] * Active_Preset.Fraction_Bypass);
+#else
             efxoutl[i] = (origl[i] * (1.0f - Active_Preset.Fraction_Bypass) + efxoutl[i] * Active_Preset.Fraction_Bypass);
             efxoutr[i] = (origr[i] * (1.0f - Active_Preset.Fraction_Bypass) + efxoutr[i] * Active_Preset.Fraction_Bypass);
+#endif
         }
 
         tmp = fabsf(efxoutl[i]);
-        
+
         if (tmp > il_sum)
         {
             il_sum = tmp;
         }
-        
+
         tmp = fabsf(efxoutr[i]);
-        
+
         if (tmp > ir_sum)
         {
             ir_sum = tmp;
@@ -832,7 +936,7 @@ RKR::Control_Volume(const float *origl, const float *origr)
 void
 RKR::cleanup_efx()
 {
-    for(int i = 0; i < C_NUMBER_EFFECTS; i++)
+    for(int i = 0; i < EFX_NUMBER_EFFECTS; i++)
     {
         if(Rack_Effects[i])
             Rack_Effects[i]->cleanup();
@@ -872,6 +976,22 @@ RKR::process_effects(float *origl, float *origr, void *)
 
     if (Active_Preset.FX_Master_Active)
     {
+#ifdef RKR_PLUS_LV2
+        memcpy(input_l, origl, sizeof(float)*JACK_PERIOD);
+        memcpy(input_r, origr, sizeof(float)*JACK_PERIOD);
+
+        if (upsample)
+        {
+            // Sanity check - seems to be necessary for LV2 with up sampling...???
+            for(unsigned i = 0; i < JACK_PERIOD; ++i)
+            {
+                if(fabsf(input_l[i]) > 1.0f)
+                    input_l[i] = 0.0f;
+                if(fabsf(input_r[i]) > 1.0f)
+                    input_r[i] = 0.0f;
+            }
+        }
+#endif
         Control_Gain(origl, origr);
 
         if (Metro_Active)
@@ -901,7 +1021,9 @@ RKR::process_effects(float *origl, float *origr, void *)
         {
             if (efx_MIDIConverter->getpar(MIDIConv_FFT))
             {
+#ifndef RKR_PLUS_LV2
                 efx_MIDIConverter->fftFloat(efxoutl, efxoutr, val_sum, HarmRecNote->freqs, HarmRecNote->lfreqs);
+#endif
             }
             else
             {
@@ -978,7 +1100,7 @@ RKR::process_effects(float *origl, float *origr, void *)
             // Don't process inactive effects
             if(!EFX_Active[efx_order[i]])
                 continue;
-            
+
             // The effect out()
             Rack_Effects[efx_order[i]]->out(efxoutl, efxoutr);
 
@@ -995,3 +1117,70 @@ RKR::process_effects(float *origl, float *origr, void *)
         Control_Volume(origl, origr);
     }
 }
+
+static void* re_initialize_everything(void * _RKR)
+{
+    RKR * rkr = (RKR *) _RKR;
+    rkr->reset_all_effects();
+    rkr->Re_init_in_progress = 0;
+
+    return 0;
+}
+
+void
+RKR::reset_everything()
+{
+    int result = pthread_create(&t_init, nullptr, re_initialize_everything, this);
+    if(result != 0)
+    {
+        Handle_Message (52, "pthread_create - at reset_everything().");
+    }
+}
+
+void 
+RKR::reset_join_thread()
+{
+    if(t_init)
+    {
+        int result = pthread_join(t_init, nullptr);
+        if(result != 0)
+        {
+            Handle_Message (52, "pthread_join - at reset_join_thread().");
+        }
+
+        if(need_bogomips_message)
+        {
+            need_bogomips_message = false;
+            handle_bogomips_message = true;
+        }
+    }
+}
+
+#ifdef RKR_PLUS_LV2
+void
+RKR::lv2_update_params(uint32_t period)
+{
+    quality_update = true;
+
+    JACK_PERIOD = period;
+    Adjust_Upsample();
+    sco_anal_need_init = true;
+    
+    M_Metronome->lv2_update_params(period_master);
+    efx_FLimiter->lv2_update_params(period_master);
+    HarmRecNote->lv2_update_params(period_master);
+    StHarmRecNote->lv2_update_params(period_master);
+    RingRecNote->lv2_update_params(period_master);
+    HarmRecNote->reconota = -1;
+    StHarmRecNote->reconota = -1;
+    RingRecNote->reconota = -1;
+
+    // process all effects since they can change 
+    for (int i = 0; i < EFX_NUMBER_EFFECTS; i++)
+    {
+        Rack_Effects[i]->lv2_update_params(period_master);
+    }
+
+    quality_update = false;
+}
+#endif

@@ -27,6 +27,7 @@
 
 
 #include "global.h"
+#include "strlcpy.h"
 #include "Config_fltk.h"
 #include <FL/Fl.H>
 
@@ -165,6 +166,7 @@ Config_fltk::Config_fltk() :
     Velocity_Adjust(50),
     Converter_Octave(2),
     MIDI_Converter_On_Off(0),
+    Use_FFT(0),
     Metronome_Time(2),
     Metronome_Sound(0),
     Metronome_Volume(50),
@@ -186,6 +188,8 @@ Config_fltk::Config_fltk() :
     Rand_Current(),
     Rand_Max(6),
     Rand_Exclude(),
+    Analyzer_On_Off(false),
+    Scope_On_Off(false),
 #ifdef NSM_SUPPORT
     NSM_single_state(),
     NSM_gui_status(),
@@ -206,11 +210,11 @@ Config_fltk::PrefNom(const char *dato)
 
     if(nsm_preferences_file.empty())
     {
-        sprintf(tmpprefname, "%s %s", jackcliname, dato);
+        snprintf(tmpprefname, sizeof(tmpprefname), "%s %s", jackcliname, dato);
     }
     else    // NSM use - always use PACKAGE name since there is only one per preferences file
     {
-        sprintf(tmpprefname, "%s %s", PACKAGE, dato);
+        snprintf(tmpprefname, sizeof(tmpprefname), "%s %s", PACKAGE, dato);
     }
 
     return (tmpprefname);
@@ -222,17 +226,23 @@ Config_fltk::load_preferences(Fl_Preferences &rakarrack)
     // ************* Settings/Look ******************
     rakarrack.get(PrefNom("Schema"), Schema, 2);
 
+// NTK_EXTENDED is ntk-unofficial which supports this
+#if !defined NTK_EXTENDED && defined NTK_SUPPORT
+    font_type = 0;  // NTK does not support this ATM
+#else
     // Fonts that look good - Cantarell Bold, Computer Modern Bright Bold, DejaVu Sans Condensed
     // Free Helvetian, FreeSans, Garuda, Ubuntu, Verana Sans
     rakarrack.get(PrefNom("Font"), font_type, 0);
     // Sanity check. Can happen when NSM session copied to another computer
     // that has fewer fonts loaded than source. Also if some fonts are removed.
     // Segfault if font type is out of range.
+
     if(font_type >= Fl::set_fonts(0)) // set_fonts returns number of fonts available
     {
         fprintf(stderr, "Invalid font type, reverting to default\n");
         font_type = 0;   // reset to default
     }
+#endif
 
     rakarrack.get(PrefNom("FontSize"), font_size, C_DEFAULT_FONT_SIZE);
     rakarrack.get(PrefNom("Foreground Color"), fore_color, RKR_buttons_color);
@@ -243,7 +253,7 @@ Config_fltk::load_preferences(Fl_Preferences &rakarrack)
     rakarrack.get(PrefNom("Enable Background Image"), EnableBackgroundImage, 0);
 
     char temp[256];
-    sprintf(temp, "%s/blackbg.png", DATADIR);
+    snprintf(temp, sizeof(temp), "%s/blackbg.png", DATADIR);
     rakarrack.get(PrefNom("Background Image"), BackgroundImage, temp, 256);
 
     // Check if valid file. Revert to default if error.
@@ -251,7 +261,7 @@ Config_fltk::load_preferences(Fl_Preferences &rakarrack)
     if ((fn = fopen(BackgroundImage, "r")) == NULL)
     {
         memset(BackgroundImage, 0, sizeof (BackgroundImage));
-        strcpy(BackgroundImage, temp);
+        RKRP::strlcpy(BackgroundImage, temp, sizeof (BackgroundImage));
         fprintf(stderr, "Invalid BackgroundImage file, reverting to default\n");
     }
     else
@@ -266,7 +276,11 @@ Config_fltk::load_preferences(Fl_Preferences &rakarrack)
     // ************ Settings/Audio *******************
     if(nsm_preferences_file.empty())    // Not NSM - master Off by default = 0
     {
+#ifdef RKR_PLUS_LV2
+        rakarrack.get(PrefNom("FX_init_state"), init_state, 1); // On by default
+#else
         rakarrack.get(PrefNom("FX_init_state"), init_state, 0);
+#endif
     }
     else    // NSM - master On by default = 1
     {
@@ -402,15 +416,15 @@ Config_fltk::load_preferences(Fl_Preferences &rakarrack)
     for (int i = 0; i < cuan_jack; i++)
     {
         memset(temp, 0, sizeof (temp));
-        sprintf(temp, "Jack Port %d", i + 1);
+        snprintf(temp, sizeof(temp), "Jack Port %d", i + 1);
 
         if (i < 2)
         {
-            strcpy(j_names, jack_names[i]);
+            RKRP::strlcpy(j_names, jack_names[i], sizeof(j_names));
         }
         else
         {
-            strcpy(j_names, "");
+            RKRP::strlcpy(j_names, "", sizeof(j_names));
         }
 
         rakarrack.get(PrefNom(temp), jack_po[i].name, j_names, 128);
@@ -437,15 +451,15 @@ Config_fltk::load_preferences(Fl_Preferences &rakarrack)
     for (int i = 0; i < cuan_ijack; i++)
     {
         memset(temp, 0, sizeof (temp));
-        sprintf(temp, "Jack Port In %d", i + 1);
+        snprintf(temp, sizeof(temp), "Jack Port In %d", i + 1);
 
         if (i < 1)
         {
-            strcpy(j_names, jack_inames[i]);
+            RKRP::strlcpy(j_names, jack_inames[i], sizeof(j_names));
         }
         else
         {
-            strcpy(j_names, "");
+            RKRP::strlcpy(j_names, "", sizeof(j_names));
         }
 
         rakarrack.get(PrefNom(temp), jack_poi[i].name, j_names, 128);
@@ -462,12 +476,12 @@ Config_fltk::load_preferences(Fl_Preferences &rakarrack)
     // ******************* Settings/User *******************
     // Get user default bank file from Settings/Bank/ --Bank Filename
     memset(temp, 0, sizeof (temp));
-    sprintf(temp, "%s/Default.rkrb", DATADIR);
+    snprintf(temp, sizeof(temp), "%s/Default.rkrb", DATADIR);
     rakarrack.get(PrefNom("Bank Filename"), BankFilename, temp, 127);
 
     // Get user bank directory
     memset(temp, 0, sizeof (temp));
-    sprintf(temp, "%s", UD_NOT_SET);
+    snprintf(temp, sizeof(temp), "%s", UD_NOT_SET);
     rakarrack.get(PrefNom("User Directory"), UDirFilename, temp, 127);
     global_user_directory = UDirFilename;
 
@@ -529,14 +543,18 @@ Config_fltk::load_preferences(Fl_Preferences &rakarrack)
 
     // Last bank and preset selected
     rakarrack.get(PrefNom("Bank Selected"), active_bank, 0);
+#ifndef RKR_PLUS_LV2
     rakarrack.get(PrefNom("Preset Num"), Preset_Number, 1);
-
+#else
+    Preset_Number = 1;  // For LV2 we don't load the preset
+#endif
     // MIDIConverter
     rakarrack.get(PrefNom("Midi Out Channel"), Midi_Out_Channel, 1);
     rakarrack.get(PrefNom("Trigger Adjust"), Trigger_Adjust, 4);
     rakarrack.get(PrefNom("Velocity Adjust"), Velocity_Adjust, 50);
     rakarrack.get(PrefNom("Converter Octave"), Converter_Octave, 2);
     rakarrack.get(PrefNom("MIDI Converter On/Off"), MIDI_Converter_On_Off, 0);
+    rakarrack.get(PrefNom("Use FFT"), Use_FFT, 0);
 
     // Metronome
     rakarrack.get(PrefNom("Internal Metronome Time"), Metronome_Time, 2);
@@ -569,7 +587,7 @@ Config_fltk::load_preferences(Fl_Preferences &rakarrack)
     rakarrack.get(PrefNom("Rand Max"), Rand_Max, 6);
 
     memset(temp, 0, sizeof (temp));
-    rakarrack.get(PrefNom("Rand Exclude"), Rand_Exclude, temp, C_NUMBER_EFFECTS + 1);
+    rakarrack.get(PrefNom("Rand Exclude"), Rand_Exclude, temp, EFX_NUMBER_EFFECTS + 1);
 
 #ifdef NSM_SUPPORT
     if(!nsm_preferences_file.empty())
@@ -605,7 +623,11 @@ void Config_fltk::load_previous_state()
     }
     else    // Using NSM
     {
+#if defined FLTK_VERSION_1_4 && !defined NTK_SUPPORT
+        Fl_Preferences rakarrack(nsm_preferences_file.c_str(), jack_client_name, NULL, Fl_Preferences::USER_L);
+#else
         Fl_Preferences rakarrack(nsm_preferences_file.c_str(), jack_client_name, NULL);
+#endif
         load_preferences(rakarrack);
     }
 }

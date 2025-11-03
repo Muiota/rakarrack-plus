@@ -21,6 +21,7 @@
 #include "FPreset.h"
 
 std::string global_user_directory = "";
+const std::string C_INSERT_PRESET_FILE = "InsertPresets.rkis";
 
 FPreset::FPreset()
 {
@@ -39,7 +40,10 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
     if( (strcmp(global_user_directory.c_str(), DATADIR) != 0) && (strcmp(global_user_directory.c_str(), UD_NOT_SET) != 0) )
     {
         insert_preset_location = global_user_directory;
-        insert_preset_location += "InsertPresets.rkis";
+        if(insert_preset_location[insert_preset_location.size() - 1] != '/')
+            insert_preset_location += "/";
+
+        insert_preset_location += C_INSERT_PRESET_FILE;
     }
     else
     {
@@ -52,7 +56,7 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
     char *sbuf;
     int reff = 0;
     memset(pdata, 0, sizeof (int)*MAX_PDATA_SIZE);
-    
+
     if ((fn = fopen(insert_preset_location.c_str(), "r")) != NULL)
     {
         int k = 0;
@@ -63,9 +67,9 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
             {
                 sbuf = buf;
                 sscanf(buf, "%d", &reff);
-                
+
                 if (reff == eff) k++;
-                
+
                 if (k == num)
                 {
                     strsep(&sbuf, ",");
@@ -82,7 +86,14 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
         {
             char *cfilename;
             cfilename = (char *) malloc(sizeof (char) * 128);
-            memset(cfilename, 0, sizeof (*cfilename));
+
+            if(cfilename == NULL)
+            {
+                fprintf(stderr, "Cannot allocate memory for cfilename\n");
+                goto ERROR_QUIT;
+            }
+
+            memset(cfilename, 0, sizeof (char) * 128);
             while (fgets(buf, sizeof buf, fn) != NULL)
             {
                 sbuf = buf;
@@ -94,7 +105,7 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
                 {
                     strsep(&sbuf, ",");
                     strsep(&sbuf, ",");
-                    sscanf(sbuf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n",
+                    sscanf(sbuf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%127s\n",
                            &pdata[0], &pdata[1], &pdata[2], &pdata[3], &pdata[4], &pdata[5],
                            &pdata[6], &pdata[7], &pdata[8], &pdata[9], &pdata[10], &pdata[11],
                            cfilename);
@@ -114,7 +125,14 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
         {
             char *cfilename;
             cfilename = (char *) malloc(sizeof (char) * 128);
-            memset(cfilename, 0, sizeof (*cfilename));
+
+            if(cfilename == NULL)
+            {
+                fprintf(stderr, "Cannot allocate memory for cfilename\n");
+                goto ERROR_QUIT;
+            }
+
+            memset(cfilename, 0, sizeof (char) * 128);
             while (fgets(buf, sizeof buf, fn) != NULL)
             {
                 sbuf = buf;
@@ -124,7 +142,7 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
                 {
                     strsep(&sbuf, ",");
                     strsep(&sbuf, ",");
-                    sscanf(sbuf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n",
+                    sscanf(sbuf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%127s\n",
                            &pdata[0], &pdata[1], &pdata[2], &pdata[3], &pdata[4], &pdata[5],
                            &pdata[6], &pdata[7], &pdata[8], &pdata[9], &pdata[10], &pdata[11],
                            &pdata[12], &pdata[13], &pdata[14], &pdata[15], &pdata[16],
@@ -145,7 +163,14 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
         {
             char *cfilename;
             cfilename = (char *) malloc(sizeof (char) * 128);
-            memset(cfilename, 0, sizeof (*cfilename));
+
+            if(cfilename == NULL)
+            {
+                fprintf(stderr, "Cannot allocate memory for cfilename\n");
+                goto ERROR_QUIT;
+            }
+
+            memset(cfilename, 0, sizeof (char) * 128);
             while (fgets(buf, sizeof buf, fn) != NULL)
             {
                 sbuf = buf;
@@ -157,7 +182,7 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
                 {
                     strsep(&sbuf, ",");
                     strsep(&sbuf, ",");
-                    sscanf(sbuf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n",
+                    sscanf(sbuf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%127s\n",
                            &pdata[0], &pdata[1], &pdata[2], &pdata[3], &pdata[4], &pdata[5],
                            &pdata[6], &pdata[7], &pdata[8], &pdata[9], &pdata[10], &pdata[11],
                            &pdata[12], &pdata[13], &pdata[14], &pdata[15], &pdata[16],
@@ -175,7 +200,12 @@ FPreset::ReadPreset(int eff, int num, int pdata[], char *filename)
             free(cfilename);
         }
 
+ERROR_QUIT:
         fclose(fn);
+    }
+    else
+    {
+        fprintf(stderr,"Cannot load insert preset file: %s\n", insert_preset_location.c_str());
     }
 }
 

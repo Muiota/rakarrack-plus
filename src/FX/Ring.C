@@ -69,8 +69,8 @@ Ring::Ring(double sample_rate, uint32_t intermediate_bufsize) :
 
     Create_Tables(sample_rate);
 
-    setpreset(Ppreset);
-    cleanup();
+    Ring::setpreset(Ppreset);
+    Ring::cleanup();
 }
 
 Ring::~Ring()
@@ -105,11 +105,11 @@ Ring::cleanup()
 
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Ring::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
 }
 #endif // LV2
 

@@ -85,9 +85,9 @@ StereoHarm::StereoHarm(long int Quality, int DS, int uq, int dq,
     PSr = new PitchShifter(window, hq, nfSAMPLE_RATE);
     PSr->ratio = 1.0f;
 
-    setpreset(Ppreset);
+    StereoHarm::setpreset(Ppreset);
 
-    cleanup();
+    StereoHarm::cleanup();
 }
 
 StereoHarm::~StereoHarm()
@@ -135,23 +135,14 @@ StereoHarm::reset_parameters(std::vector<int> parameters)
     
     cleanup();
 }
-
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 StereoHarm::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        adjust(STE_DOWN, PERIOD);
-        clear_initialize();
-        initialize();
-    }
-    else
-    {
-        PERIOD = period;
-        adjust(STE_DOWN, PERIOD);
-    }
+    PERIOD = period_master = period;
+    adjust(STE_DOWN, PERIOD);
+    clear_initialize();
+    initialize();
 }
 #endif // LV2
 
@@ -314,11 +305,12 @@ StereoHarm::LV2_parameters(std::string &s_buf, int type)
             case Sharm_MIDI:
                 if(type == CARLA)
                 {
-                    Carla_LV2_port(s_buf, i + 1, getpar( Sharm_Chord ), sharm_parameters[i * 3 + 1], sharm_parameters[i * 3 + 2]);
+                    Carla_LV2_port(s_buf, i + 1, getpar( Sharm_MIDI ), sharm_parameters[i * 3 + 1], sharm_parameters[i * 3 + 2]);
                 }
                 else
                 {
-                    // non-mixer does not have midi
+                    s_buf += NTS( getpar( Sharm_MIDI ));
+                    s_buf += ":";
                 }
             break;
         }
@@ -328,8 +320,8 @@ StereoHarm::LV2_parameters(std::string &s_buf, int type)
 std::string
 StereoHarm::get_URI(int type)
 {
-    if(type == NON_MIXER)
-        return SHARMNOMIDLV2_URI;
+    if(type == NON_MIXER_XT)
+        return STEROHARMLV2_URI;
 
     return STEROHARMLV2_URI;
 };
@@ -337,8 +329,8 @@ StereoHarm::get_URI(int type)
 std::string
 StereoHarm::get_name(int type)
 {
-    if(type == NON_MIXER)
-        return SHARM_NAME_NO_MIDI;
+    if(type == NON_MIXER_XT)
+        return SHARM_NAME;
 
     return SHARM_NAME;
 };

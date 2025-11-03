@@ -36,8 +36,8 @@ Exciter::Exciter(double sample_rate, uint32_t intermediate_bufsize) :
 {
     harm = new HarmEnhancer(rm, 2500.0f, 8000.0, 1.0f, sample_rate, PERIOD);
 
-    cleanup();
-    setpreset(Ppreset);
+    Exciter::cleanup();
+    Exciter::setpreset(Ppreset);
 }
 
 Exciter::~Exciter()
@@ -54,11 +54,11 @@ Exciter::cleanup()
     harm->cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Exciter::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
     harm->lv2_update_params(period);
 }
 #endif // LV2

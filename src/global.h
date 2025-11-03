@@ -35,21 +35,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sstream>  // NTS
-#include <FL/Fl_Tiled_Image.H>
 
 // un-comment to activate stress test - to toggle stress testing, middle mouse click
 // the random button. This should only be activated for testing purposes.
 //#define STRESS_TEST_CHECK 1
 
+#ifndef LV2_SUPPORT
 class RKRGUI;   // forward declaration
 class RKR;      // forward declaration
 
+#include <FL/Fl_Tiled_Image.H>
 // These are defined in rakarrack.cxx
-extern Fl_Tiled_Image *back; 
+extern Fl_Tiled_Image *back;
 extern Fl_Color global_leds_color; 
 extern Fl_Color global_back_color; 
 extern Fl_Color global_fore_color; 
 extern Fl_Color global_label_color;
+
 extern int global_font_type;
 extern int global_font_size;
 extern int global_look_changed;
@@ -65,6 +67,7 @@ extern std::string nsm_preferences_file;
 
 // Used by FPreset
 extern std::string global_user_directory;
+extern const std::string C_INSERT_PRESET_FILE;
 
 const int C_DEFAULT_FONT_SIZE = 10;
 
@@ -83,7 +86,6 @@ const unsigned C_NO_DRAG = 1000;
 extern int global_error_number;
 extern char *jack_client_name;
 
-
 /* Milliseconds - used for quality changes by usleep().
    The amounts are much greater than necessary for the 
    delete and re-initialize. But the delay is useful to
@@ -91,6 +93,12 @@ extern char *jack_client_name;
    is not real time safe. */
 const unsigned C_MILLISECONDS_25 = 250000;   // 1/4 second
 const unsigned C_MILLISECONDS_50 = 500000;   // 1/2 second
+
+/* For up-sampling changes, all effects, arrays etc must be
+   deleted and then re-initialized. Based on my computer, the
+   three seconds is necessary to prevent crashes... */
+const unsigned C_MILLISECONDS_300 = 3000000; // 3 seconds
+#endif // ndef LV2_SUPPORT
 
 inline int Dry_Wet (int x) {return 127 - x;}
 
@@ -271,6 +279,7 @@ static inline float f_pow2(float x)
     }
 }
 
+#ifndef LV2_SUPPORT
 template <typename T>
 std::string FTSP(T value, int digits)
 {   // For conversion from float to string precision
@@ -286,6 +295,7 @@ enum RKR_Default_Colors
     RKR_buttons_color = 56,                 // Black
     RKR_leds_color = 12660480               // Light green
 };
+#endif // ndef LV2_SUPPORT
 
 /**
  * The effect index used by switch(): case: and order number.
@@ -338,9 +348,9 @@ enum EFX_Index
     EFX_COMPBAND,
     EFX_OPTICALTREM,
     EFX_VIBE,
-    EFX_INFINITY,       // 46 - (0 to 46 = C_NUMBER_EFFECTS)
-    
-    // Indexes 47 - 68 are unused and can be used for expansion of rack effects.
+    EFX_INFINITY,
+    EFX_RESSOLUTION,    // 47
+    EFX_NUMBER_EFFECTS, // Insert new effects before this - max of 68
     
     // This is the main window effect order. Must be hard coded to 69,
     // the last item of lv[70][20] bank.
@@ -358,6 +368,7 @@ enum EFX_Index
     EFX_MASTER_ON_OFF = 124
 };
 
+#ifndef LV2_SUPPORT
 enum ASCII_Index
 {
     ASCII_Space = 32,
@@ -424,7 +435,7 @@ enum USER_DATA_index
     
     UD_random_edit          = 5000,
     // Everything between here is used by random editor
-    UD_random_end           = (5000 + 47), //  C_NUMBER_EFFECTS = 47
+    UD_random_end           = (5000 + EFX_NUMBER_EFFECTS),
     
     // The user_data for RKR_Choice 'Preset' widgets. For use in identifying
     // the correct widget when user 'Insert' or 'Delete' key is used. For
@@ -476,10 +487,11 @@ enum USER_DATA_index
     UD_PRESET_COMPBAND,
     UD_PRESET_OPTICALTREM,
     UD_PRESET_VIBE,
-    UD_PRESET_INFINITY,            // 12046
+    UD_PRESET_INFINITY,
+    UD_PRESET_RESSOLUTION,         // 12047
     
     // The max number of effects based on bank file saving
-    // The range from 12047 to 12068 can be used for expansion
+    // The range from 12048 to 12068 can be used for expansion
     UD_PRESET_MAX_EFFECTS          = 12068,
     
     // End Highlighted Items - after (UD_Highlight_End)
@@ -489,8 +501,5 @@ enum USER_DATA_index
     UD_Bank_Number                 = 15000         // Custom MIDI table bank CC Number
 
 };
-
-
-#endif
-
-
+#endif  // ndef LV2_SUPPORT
+#endif  // DXEMU_H

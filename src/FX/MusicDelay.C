@@ -78,8 +78,8 @@ MusicDelay::MusicDelay(double sample_rate, uint32_t intermediate_bufsize) :
     ldelay2 = new float[maxx_delay];
     rdelay2 = new float[maxx_delay];
 
-    setpreset(Ppreset);
-    cleanup();
+    MusicDelay::setpreset(Ppreset);
+    MusicDelay::cleanup();
 }
 
 MusicDelay::~MusicDelay()
@@ -114,11 +114,11 @@ MusicDelay::cleanup()
     oldr2 = 0.0;
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 MusicDelay::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
 }
 #endif // LV2
 

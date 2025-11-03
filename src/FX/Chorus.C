@@ -79,8 +79,8 @@ Chorus::Chorus(double sample_rate, uint32_t intermediate_bufsize) :
     lfo->effectlfoout(&lfol, &lfor);
     dl2 = getdelay(lfol);
     dr2 = getdelay(lfor);
-    setpreset(Ppreset); // must be set after call to getdelay
-    cleanup();
+    Chorus::setpreset(Ppreset); // must be set after call to getdelay
+    Chorus::cleanup();
 }
 
 Chorus::~Chorus()
@@ -257,11 +257,11 @@ Chorus::cleanup()
     }
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Chorus::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
     fPERIOD = period;
     lfo->updateparams(period);
 }
@@ -276,14 +276,14 @@ Chorus::set_random_parameters()
         {
             case Chorus_LFO_Tempo:
             {
-                int value = (int) (RND * 600);
+                int value = (int) (RND * LFO_FREQ_MAX);
                 changepar (i, value + 1);
             }
             break;
 
             case Chorus_LFO_Type:
             {
-                int value = (int) (RND * 12);
+                int value = (int) (RND * LFO_NUM_TYPES);
                 changepar (i, value);
             }
             break;

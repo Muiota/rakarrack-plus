@@ -95,8 +95,8 @@ CompBand::CompBand(double sample_rate, uint32_t intermediate_bufsize) :
     CMH->setpreset(2);
     CH->setpreset(2);
 
-    setpreset(Ppreset);
-    cleanup();
+    CompBand::setpreset(Ppreset);
+    CompBand::cleanup();
 }
 
 CompBand::~CompBand()
@@ -133,23 +133,16 @@ CompBand::cleanup()
     CH->cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 CompBand::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        setCross1(Cross1);
-        setCross2(Cross2);
-        setCross3(Cross3);
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    setCross1(Cross1);
+    setCross2(Cross2);
+    setCross3(Cross3);
 
     CL->lv2_update_params(period);
     CML->lv2_update_params(period);

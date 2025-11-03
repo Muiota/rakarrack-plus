@@ -41,9 +41,9 @@ ShelfBoost::ShelfBoost(double sample_rate, uint32_t intermediate_bufsize) :
     interpbuf(NULL)
 {
     initialize();
-    cleanup();
+    ShelfBoost::cleanup();
 
-    setpreset(Ppreset);
+    ShelfBoost::setpreset(Ppreset);
 }
 
 ShelfBoost::~ShelfBoost()
@@ -61,23 +61,16 @@ ShelfBoost::cleanup()
     RB1r->cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 ShelfBoost::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        set_q(Pq1);
-        set_freq(Pfreq1);
-        set_level(Plevel);
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    set_q(Pq1);
+    set_freq(Pfreq1);
+    set_level(Plevel);
 }
 #endif // LV2
 

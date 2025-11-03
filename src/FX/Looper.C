@@ -93,8 +93,8 @@ Looper::Looper(float size, double samplerate, uint32_t intermediate_bufsize) :
     t2ldelay = new float[maxx_delay];
     t2rdelay = new float[maxx_delay];
 
-    setpreset(Ppreset);
-    cleanup();
+    Looper::setpreset(Ppreset);
+    Looper::cleanup();
 }
 
 Looper::~Looper()
@@ -160,6 +160,17 @@ Looper::initdelays()
     
     Srate_Attack_Coeff = 90.0f / (dl + dl2); // Set swell time
 }
+
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
+void
+Looper::lv2_update_params(uint32_t period)
+{
+    PERIOD = period_master = period;
+    ticker.lv2_update_params(period);
+    ticker.cleanup();
+    cleanup();
+}
+#endif
 
 /*
  * Effect output
@@ -547,7 +558,6 @@ Looper::changepar(int npar, int value)
             Precord = 0;
             Pplay = rplaystate;
             if (Pautoplay) Pplay = 1;
-            Pstop = 0;
         }
         else
         {

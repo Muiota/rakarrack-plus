@@ -74,7 +74,7 @@ StompBox::StompBox(int wave_res, int wave_upq, int wave_dnq,
 {
     initialize();
 
-    setpreset(Ppreset);
+    StompBox::setpreset(Ppreset);
 }
 
 StompBox::~StompBox()
@@ -137,23 +137,16 @@ StompBox::reset_parameters(std::vector<int> parameters)
     cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 StompBox::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        init_mode(Pmode);
-        init_tone();
-        cleanup();
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    init_mode(Pmode);
+    init_tone();
+    cleanup();
 }
 #endif // LV2
 

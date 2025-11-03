@@ -79,8 +79,8 @@ Valve::Valve(double sample_rate, uint32_t intermediate_bufsize) :
     sethpf(1);
     init_coefs();
 
-    setpreset(Ppreset);
-    cleanup();
+    Valve::setpreset(Ppreset);
+    Valve::cleanup();
 }
 
 Valve::~Valve()
@@ -105,24 +105,17 @@ Valve::cleanup()
     itmr = 0.0f;
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Valve::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        cleanup();
-        setlpf(Plpf);
-        sethpf(Phpf);
-        //cleanup();
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    cleanup();
+    setlpf(Plpf);
+    sethpf(Phpf);
+    //cleanup();
 
     harm->lv2_update_params(period);
 }

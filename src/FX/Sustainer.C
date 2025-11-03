@@ -56,9 +56,9 @@ Sustainer::Sustainer(double sample_rate, uint32_t intermediate_bufsize) :
     calpha = cSAMPLE_RATE / (cSAMPLE_RATE + tmp);
     cbeta = 1.0f - calpha;
 
-    setpreset(Ppreset);
+    Sustainer::setpreset(Ppreset);
 
-    cleanup();
+    Sustainer::cleanup();
 }
 
 Sustainer::~Sustainer()
@@ -78,11 +78,11 @@ Sustainer::cleanup()
     cpthresh = cthresh; //dynamic threshold
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Sustainer::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
 }
 #endif // LV2
 

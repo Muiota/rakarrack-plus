@@ -54,8 +54,8 @@ WahWah::WahWah(double sample_rate, uint32_t intermediate_bufsize) :
 {
     lfo = new EffectLFO(sample_rate);
     filterpars = new FilterParams(0, 64, 64, sample_rate, PERIOD);
-    setpreset(Ppreset);
-    cleanup();
+    WahWah::setpreset(Ppreset);
+    WahWah::cleanup();
 }
 
 WahWah::~WahWah()
@@ -74,8 +74,6 @@ WahWah::out(float * efxoutl, float * efxoutr)
 {
     if (filterpars->changed)
     {
-        filterpars->changed = false;
-        cleanup();
         return;
     }
 
@@ -135,29 +133,28 @@ WahWah::out(float * efxoutl, float * efxoutr)
 void
 WahWah::cleanup()
 {
+    filterpars->changed = true;
+    usleep(500);    // to allow time for out() to complete since reinitfilter() deletes the filter
     reinitfilter();
     ms1 = 0.0;
     ms2 = 0.0;
     ms3 = 0.0;
     ms4 = 0.0;
+    filterpars->changed = false;
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 WahWah::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        delete filterpars;
-        filterpars = new FilterParams(0, 64, 64, fSAMPLE_RATE, PERIOD);
-        reinitfilter();
-    }
-    else
-    {
-        PERIOD = period;
-    }
-    
+    filterpars->changed = true;
+    usleep(500);    // to allow time for out() to complete since reinitfilter() deletes the filter
+    PERIOD = period_master = period;
+    delete filterpars;
+    filterpars = new FilterParams(0, 64, 64, fSAMPLE_RATE, PERIOD);
+    reinitfilter();
+    filterpars->changed = false;
+
     lfo->updateparams(period);
 }
 #endif // LV2
@@ -184,14 +181,14 @@ WahWah::set_random_parameters()
 
             case WahWah_LFO_Tempo:
             {
-                int value = (int) (RND * 600);
+                int value = (int) (RND * LFO_FREQ_MAX);
                 changepar (i, value + 1);
             }
             break;
 
             case WahWah_LFO_Type:
             {
-                int value = (int) (RND * 12);
+                int value = (int) (RND * LFO_NUM_TYPES);
                 changepar (i, value);
             }
             break;
@@ -495,11 +492,8 @@ WahWah::changepar(int npar, int value)
             filterpars->Pvowels[1].formants[1].q = 64;
             break;
         }   // switch (Pmode)
-        /* We do not want to re-initialize the filter here because it deletes the filter. 
-         * If it hits just at the wrong moment, then out() will try to use the just deleted filter
-         * and crash. So we set changed and check and delete in out() at - if (filterpars->changed).
-         */
-        filterpars->changed = true;
+
+        cleanup();
         break;
     }   // case 10:
 

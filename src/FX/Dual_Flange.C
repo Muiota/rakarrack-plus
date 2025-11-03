@@ -118,8 +118,8 @@ Dflange::Dflange(double sample_rate, uint32_t intermediate_bufsize) :
     rdelayline1->set_mix(0.5f);
 
     lfo = new EffectLFO(sample_rate);
-    setpreset(Ppreset);
-    cleanup();
+    Dflange::setpreset(Ppreset);
+    Dflange::cleanup();
 }
 
 Dflange::~Dflange()
@@ -169,11 +169,11 @@ Dflange::cleanup()
     rsA = rsB = lsA = lsB = 0.0f;
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Dflange::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
     lfo->updateparams(period);
 }
 #endif // LV2
@@ -242,14 +242,14 @@ Dflange::set_random_parameters()
 
             case DFlange_LFO_Tempo:
             {
-                int value = (int) (RND * 600);
+                int value = (int) (RND * LFO_FREQ_MAX);
                 changepar (i, value + 1);
             }
             break;
 
             case DFlange_LFO_Type:
             {
-                int value = (int) (RND * 12);
+                int value = (int) (RND * LFO_NUM_TYPES);
                 changepar (i, value);
             }
             break;

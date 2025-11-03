@@ -17,7 +17,8 @@
   <body dir="ltr" style="color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" lang="en-US">
       <h3>General</h3>
       <p><a href="#cmd">Command line options</a> <a href="#screen">The Main Screen</a> 
-      <a href="#conn">Connecting</a> <a href="#pyb">Presets &amp; banks</a> 
+      <a href="#conn">Connecting</a> <a href="#aux">Aux Input</a>
+      <a href="#pyb">Presets &amp; banks</a> 
       <a href="#settings">Preferences</a> <a href="#scuts">Shortcuts</a> 
       <a href="#session">Session Support</a>
 
@@ -307,6 +308,9 @@ screenshot shows the connection of a guitar, usually mono aural.</p>
 
 <p><img src="imagenes/jack_conections.jpg" alt="rakarrack Qjackctl Connect" align="bottom" border="1" height="313" vspace="10" width="562"></p>
 
+<h3><a name="aux"></a>Aux Input</h3>
+<p>The "aux" audio input is used by the <a href="effects.html#Vocoder">Vocoder</a> effect for voice input. Also it is set as the default input for the <a href="aci.html">Analog Control Interface (ACI)</a>.</p>
+
 <h3><a name="pyb"></a>Presets &amp; Banks</h3>
 
 <p>The state of the rack can be saved to a file at any
@@ -472,7 +476,7 @@ for user banks. For best results, files could be named using CC parameter value 
   </ul>
 
 <p><b>MIDI Bank Select</b></p>
-<p>The number in [XX] brackets preceeding the bank label is the MIDI CC 0,
+<p>The number in [XX] brackets preceding the bank label is the MIDI CC 0,
     Bank Selection parameter value to send for MIDI bank select.</p>
 
 
@@ -547,7 +551,7 @@ is Off.</p>
 <p>Input DC Removal. Removes constant offset from input signal.  If you
 experience strange behavior with compressor or distortion, or if you see
 output signal even when no sound is going in, enable it.  A "cheapo"
-soundcard or microphone inputs can be sources of this problem.</p>
+sound card or microphone inputs can be sources of this problem.</p>
 <p><b>Preserve Gain/Master</b></p>
 <p>The Input Gain and Master Volume are stored in the preset and applied
 when the preset is loaded.  If this option is enabled, the Input Level and
@@ -852,7 +856,7 @@ The mouse focus setting is disabled by default.</p>
 
 <p><b>NSM Single State</b></p>
 <p>Check this box if you want NSM session to always save the last state of the active preset.
-This will save all changes to effects including MIDI control changes. The default behaver
+This will save all changes to effects including MIDI control changes. The default behavior
 will not save changes to the active preset as the changes are assumed to be for live 
 performance reasons. This check box is de-activated when not in NSM mode.</p>
 
@@ -1068,7 +1072,7 @@ can also be used for session support.
 <p><b>NSM Single State</b></p>
 <p>In Settings/Preferences/Misc: Check this box if you want NSM session to always save the
 last state of the active preset.
-This will save all changes to effects including MIDI control changes. The default behaver
+This will save all changes to effects including MIDI control changes. The default behavior
 will not save changes to the active preset as the changes are assumed to be for live 
 performance reasons. This check box is de-activated when not in NSM mode.</p>
 

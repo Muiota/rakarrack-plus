@@ -100,8 +100,8 @@ VaryBand::VaryBand(double sample_rate, uint32_t intermediate_bufsize) :
     lfo1 = new EffectLFO(fSAMPLE_RATE);
     lfo2 = new EffectLFO(fSAMPLE_RATE);
 
-    setpreset(Ppreset);
-    cleanup();
+    VaryBand::setpreset(Ppreset);
+    VaryBand::cleanup();
 }
 
 VaryBand::~VaryBand()
@@ -131,23 +131,16 @@ VaryBand::cleanup()
     hpf3r->cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 VaryBand::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        setCross1(Cross1);
-        setCross2(Cross2);
-        setCross3(Cross3);
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    setCross1(Cross1);
+    setCross2(Cross2);
+    setCross3(Cross3);
 
     lfo1->updateparams(PERIOD);
     lfo2->updateparams(PERIOD);
@@ -164,7 +157,7 @@ VaryBand::set_random_parameters()
             case VaryBand_LFO_Tempo_1:
             case VaryBand_LFO_Tempo_2:
             {
-                int value = (int) (RND * 600);
+                int value = (int) (RND * LFO_FREQ_MAX);
                 changepar (i, value + 1);
             }
             break;
@@ -172,7 +165,7 @@ VaryBand::set_random_parameters()
             case VaryBand_LFO_Type_1:
             case VaryBand_LFO_Type_2:
             {
-                int value = (int) (RND * 12);
+                int value = (int) (RND * LFO_NUM_TYPES);
                 changepar (i, value);
             }
             break;

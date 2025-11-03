@@ -93,8 +93,8 @@ Synthfilter::Synthfilter(double sample_rate, uint32_t intermediate_bufsize) :
 
     lfo = new EffectLFO(sample_rate);
 
-    setpreset(Ppreset);
-    cleanup();
+    Synthfilter::setpreset(Ppreset);
+    Synthfilter::cleanup();
 }
 
 Synthfilter::~Synthfilter()
@@ -284,11 +284,11 @@ Synthfilter::cleanup()
     }
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Synthfilter::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
     lfo->updateparams(period);
     inv_period = 1.f / (float) period;
 }
@@ -316,14 +316,14 @@ Synthfilter::set_random_parameters()
 
             case Synthfilter_LFO_Tempo:
             {
-                int value = (int) (RND * 600);
+                int value = (int) (RND * LFO_FREQ_MAX);
                 changepar (i, value + 1);
             }
             break;
 
             case Synthfilter_LFO_Type:
             {
-                int value = (int) (RND * 12);
+                int value = (int) (RND * LFO_NUM_TYPES);
                 changepar (i, value);
             }
             break;

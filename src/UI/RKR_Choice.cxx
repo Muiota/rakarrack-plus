@@ -86,6 +86,7 @@ void RKR_Choice::draw()
 
         // Draw arrow area
         fl_color(active_r() ? labelcolor() : fl_inactive(labelcolor()));
+#ifndef NTK_SUPPORT
         if (Fl::is_scheme("plastic"))
         {
             // Show larger up/down arrows...
@@ -93,6 +94,7 @@ void RKR_Choice::draw()
             fl_polygon(x1, y1 + 1, x1 + w1, y1 - w1 + 1, x1 + 2 * w1, y1 + 1); // Down arrow
         }
         else    // Gtk and Gleam 
+#endif
         {
 #if 1
             /* Draw Box and single down arrow, looks better to me */
@@ -158,6 +160,9 @@ void RKR_Choice::draw()
             l.font = m.labelsize_ || m.labelfont_ ? m.labelfont_ : textfont();
             l.size = m.labelsize_ ? m.labelsize_ : textsize();
             l.color = m.labelcolor_ ? m.labelcolor_ : textcolor();
+#if defined FLTK_VERSION_1_4 && !defined NTK_SUPPORT
+            l.h_margin_ = l.v_margin_ = l.spacing = 0;
+#endif
             if (!m.active()) l.color = fl_inactive((Fl_Color) l.color);
             fl_draw_shortcut = 2; // hack value to make '&' disappear
             l.draw(xx + 3, yy, ww > 6 ? ww - 6 : 0, hh, FL_ALIGN_LEFT);

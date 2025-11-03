@@ -38,7 +38,7 @@ public:
     ~HarmEnhancer();
     void cleanup();
     
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
     void lv2_update_params(uint32_t period);
 #endif // LV2
     
@@ -63,10 +63,12 @@ private:
     float *inputl;
     float *inputr;
     float vol;
+#ifdef UNUSED_STUFF
     float itm1l;
     float itm1r;
     float otm1l;
     float otm1r;
+#endif
 
     float p[HARMONICS];
 

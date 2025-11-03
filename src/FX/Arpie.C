@@ -83,9 +83,9 @@ Arpie::Arpie(double sample_rate, uint32_t intermediate_bufsize) :
     rdelay = new float[maxx_delay];
     pattern = new int[MAXHARMS];
 
-    setpreset(Ppreset);
+    Arpie::setpreset(Ppreset);
     setpattern(0);
-    cleanup();
+    Arpie::cleanup();
 }
 
 Arpie::~Arpie()
@@ -159,11 +159,11 @@ Arpie::set_random_parameters()
     }
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Arpie::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
 }
 #endif // LV2
 
@@ -586,10 +586,6 @@ Arpie::changepar(int npar, int value)
         break;
     case Arpie_Harm:
         Pharms = value;
-        if ((Pharms < 2) && (Pharms >= MAXHARMS))
-        {
-            Pharms = 2;
-        }
         break;
     case Arpie_Pattern:
         setpattern(value);

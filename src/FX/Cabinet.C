@@ -28,7 +28,7 @@
 Cabinet::Cabinet(double sample_frequency, uint32_t intermediate_bufsize) :
     EQ(sample_frequency, intermediate_bufsize)
 {
-    setpreset(Ppreset);
+    Cabinet::setpreset(Ppreset);
 }
 
 void
@@ -195,7 +195,7 @@ Cabinet::getpar(int npar)
     return 0;
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Cabinet::lv2_update_params(uint32_t period)
 {

@@ -94,9 +94,9 @@ CoilCrafter::CoilCrafter(double sample_rate, uint32_t intermediate_bufsize) :
     RB2l = new AnalogFilter(2, 2000.0f, 1.0f, 0, sample_rate, interpbuf);
     RB2r = new AnalogFilter(2, 2000.0f, 1.0f, 0, sample_rate, interpbuf);
 
-    cleanup();
+    CoilCrafter::cleanup();
 
-    setpreset(Ppreset);
+    CoilCrafter::setpreset(Ppreset);
 }
 
 CoilCrafter::~CoilCrafter()
@@ -125,11 +125,11 @@ CoilCrafter::cleanup()
     RB2r->cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 CoilCrafter::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
     harm->lv2_update_params(period);
 }
 #endif // LV2

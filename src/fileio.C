@@ -24,7 +24,53 @@
 #include <algorithm>    // std::remove
 #include <fstream>
 #include "process.h"
+#include "strlcpy.h"
 #include <FL/fl_ask.H> // for error pop up
+
+enum
+{
+    RKR_VERSION = 0,
+    RKR_AUTHOR,
+    RKR_PRESET_NAME,
+    RKR_MASTER_CTRL,
+    RKR_EFX_PARAMS,     // 4
+    RKR_EFX_ORDER = 14,      // 4 + 10
+    RKR_MIDI_LEARN,     // 15
+    PREFS_LOOK = 143,   // 15 + 128
+    PREFS_AUDIO,
+    PREFS_MASTER,
+    PREFS_HARM,
+    PREFS_REVTRON,
+    PREFS_CONVO,
+    PREFS_SEQUENCE,
+    PREFS_SHIFTER,
+    PREFS_VOCODER,
+    PREFS_STEREO_HARM,
+    PREFS_DIST,
+    PREFS_OVRD,
+    PREFS_DERELICT,
+    PREFS_DBAND,
+    PREFS_STOMP,
+    PREFS_MIDI_TAB,
+    PREFS_MISC_TAB,
+    PREFS_BANK_FILE_NAME,
+    PREFS_USER_DIRECTORY,
+    PREFS_USER_NAME,
+    PREFS_MAIN,
+    PREFS_MIDI_CONVERT,
+    PREFS_METRONOME,
+    PREFS_TAP_TEMPO,
+    PREFS_PRINCIPAL,
+    PREFS_BANK,
+    PREFS_ORDER,
+    PREFS_SETTINGS,
+    PREFS_HELP,
+    PREFS_RANDOM,
+    PREFS_RAND_EXCLUDE,
+    PREFS_MIDI_LEARN,
+    PREFS_TRIGGER,
+    PREFS_DELAY
+};
 
 /**
  *  Individual preset file loading. Main menu File/Load Preset.
@@ -57,7 +103,7 @@ void RKR::apply_effect_parameters(std::string s_buf, int fx_index, PresetBankStr
     }
 
     // Run through the effects for a match to the effect index
-    for (int effect = 0; effect < C_NUMBER_EFFECTS; effect++)
+    for (int effect = 0; effect < EFX_NUMBER_EFFECTS; effect++)
     {
         if (effect == fx_index)
         {
@@ -80,7 +126,7 @@ void RKR::apply_effect_parameters(std::string s_buf, int fx_index, PresetBankStr
 
                 // Gotta remove the '\n' from the file name or error.
                 s_name.erase(std::remove(s_name.begin(), s_name.end(), '\n'), s_name.end());
-                strcpy(preset_loaded.ConvoFiname, s_name.c_str());
+                RKRP::strlcpy(preset_loaded.ConvoFiname, s_name.c_str(), sizeof(preset_loaded.ConvoFiname));
             }
             
             else if(fx_index == EFX_REVERBTRON)
@@ -89,7 +135,7 @@ void RKR::apply_effect_parameters(std::string s_buf, int fx_index, PresetBankStr
 
                 // Gotta remove the '\n' from the file name or error.
                 s_name.erase(std::remove(s_name.begin(), s_name.end(), '\n'), s_name.end());
-                strcpy(preset_loaded.RevFiname, s_name.c_str());
+                RKRP::strlcpy(preset_loaded.RevFiname, s_name.c_str(), sizeof(preset_loaded.RevFiname));
             }
 
             else if(fx_index == EFX_ECHOTRON)
@@ -98,7 +144,7 @@ void RKR::apply_effect_parameters(std::string s_buf, int fx_index, PresetBankStr
 
                 // Gotta remove the '\n' from the file name or error.
                 s_name.erase(std::remove(s_name.begin(), s_name.end(), '\n'), s_name.end());
-                strcpy(preset_loaded.EchoFiname, s_name.c_str());
+                RKRP::strlcpy(preset_loaded.EchoFiname, s_name.c_str(), sizeof(preset_loaded.EchoFiname));
             }
             
             return; // we found and processed what we were looking for
@@ -121,7 +167,7 @@ void RKR::apply_effect_parameters(std::string s_buf, int fx_index, PresetBankStr
 void RKR::get_effect_parameters(std::string &s_buf, int fx_index)
 {
      // Run through the effects for a match to the effect index
-    for (int effect = 0; effect < C_NUMBER_EFFECTS; effect++)
+    for (int effect = 0; effect < EFX_NUMBER_EFFECTS; effect++)
     {
         if (effect == fx_index)
         {
@@ -183,116 +229,21 @@ void RKR::get_effect_parameters(std::string &s_buf, int fx_index)
 void
 RKR::save_preset(const std::string &filename)
 {
-    FILE *fn;
-
-    std::string s_buf;
-
-    fn = fopen(filename.c_str(), "w");
-
-    if (errno == EACCES)
+    std::ofstream outputFile(filename);
+    if (!outputFile.is_open())
     {
         Handle_Message(3);
-        fclose(fn);
         return;
     }
-    
-    // Update active preset for any user changes
-    refresh_active_preset();
-    
-    // Copy active preset for file operations
-    PresetBankStruct Save_Preset = Active_Preset;
-    
-    // Program release version
-    s_buf = VERSION;
-    s_buf += "\n";
-    fputs(s_buf.c_str(), fn);
 
-    // Author
-    s_buf.clear();
-    if (strlen(Save_Preset.Author) != 0)
-    {
-        s_buf = Save_Preset.Author;
-        s_buf += "\n";
-    }
-    else
-    {
-        if (strlen(Config.UserRealName) != 0)
-        {
-            s_buf = Config.UserRealName;
-            s_buf += "\n";
-        }
-        else
-        {
-            s_buf = getenv("USER");
-            s_buf += "\n";
-        }
-    }
+    // Get the current state
+    std::string s_buf;
+    rkr_save_state(s_buf);
 
-    fputs(s_buf.c_str(), fn);
+    // Write it to file
+    outputFile << s_buf;
 
-    // Preset Name
-    fputs(Save_Preset.Preset_Name, fn);
-    fputs("\n", fn);
-
-    // Master control
-    s_buf.clear();
-    
-    s_buf += NTS(Save_Preset.Input_Gain);
-    s_buf += ",";
-    s_buf += NTS(Save_Preset.Master_Volume);
-    s_buf += ",";
-    s_buf += NTS(Save_Preset.Fraction_Bypass);
-    s_buf += ",";
-    s_buf += NTS(Save_Preset.FX_Master_Active);
-    s_buf += "\n";
-
-    fputs(s_buf.c_str(), fn);
-
-    // Effect parameters
-    for (int order = 0; order < C_NUMBER_ORDERED_EFFECTS; order++)
-    {
-        int effect = Save_Preset.Effect_Params[EFX_ORDER][order];
-        s_buf.clear();
-
-        get_effect_parameters(s_buf, effect);
-        fputs(s_buf.c_str(), fn);
-    }
-
-    // Effect Order
-    s_buf.clear();
-    for(int i = 0; i < 10; i++)
-    {
-        s_buf += NTS(Save_Preset.Effect_Params[EFX_ORDER][i]);
-        if(i < 9)
-        {
-            s_buf += ",";
-        }
-    }
-    s_buf += "\n";
-    
-    fputs(s_buf.c_str(), fn);
-
-    // MIDI learn table
-    for (int i = 0; i < 128; i++)
-    {
-        s_buf.clear();
-        
-        for(int j = 0; j < 20; j++)
-        {
-            s_buf += NTS(Save_Preset.XUserMIDI[i][j]);
-            
-            if(j < 19)
-            {
-                s_buf += ",";
-            }
-        }
-        
-        s_buf += "\n";
-
-        fputs(s_buf.c_str(), fn);
-    }
-
-    fclose(fn);
+    outputFile.close();
 }
 
 void
@@ -329,9 +280,6 @@ RKR::export_to_nsm_mixer(const std::string &filename)
 
     s_buf = "\tJACK_Module 0x3 create :parameter_values \"0.000000:2.000000\" :is_default 1 :chain 0x2 :active 1\n";
     fputs(s_buf.c_str(), fn);
-
-    s_buf = "\tGain_Module 0x4 create :parameter_values \"0.000000:0.000000\" :is_default 1 :chain 0x2 :active 1\n";
-    fputs(s_buf.c_str(), fn);
     
     int mixer_module_index = 7; // There are six defaults, so plugin modules start at 7
     
@@ -343,7 +291,7 @@ RKR::export_to_nsm_mixer(const std::string &filename)
         if ( !EFX_Active[effect] )  // ignore inactive effects
             continue;
 
-        // Not supported by non-mixer
+        // Not supported by non-mixer-xt
         if(effect == EFX_VOCODER || effect == EFX_LOOPER)
         {
             Handle_Message(48, NTS(effect));
@@ -352,18 +300,18 @@ RKR::export_to_nsm_mixer(const std::string &filename)
 
         s_buf.clear();
 
-        s_buf = "\tPlugin_Module ";
+        s_buf = "\tLV2_Plugin ";
         s_buf += "0x";
         s_buf += NTS(mixer_module_index);
         s_buf += " create :lv2_plugin_uri \"";        
-        s_buf += Rack_Effects[effect]->get_URI(NON_MIXER);
+        s_buf += Rack_Effects[effect]->get_URI(NON_MIXER_XT);
         s_buf += "\" :plugin_ins 2 :plugin_outs 2 :parameter_values \"";
         
         // Add the individual effects parameters
         s_buf += NTS( 0 );  // bypass - should be always 0
         s_buf += ":";
 
-        Rack_Effects[effect]->LV2_parameters(s_buf, NON_MIXER);
+        Rack_Effects[effect]->LV2_parameters(s_buf, NON_MIXER_XT);
 
         s_buf += "\" :is_default 0 :chain 0x2 :active 1 :number 0\n";
         fputs(s_buf.c_str(), fn);
@@ -373,6 +321,9 @@ RKR::export_to_nsm_mixer(const std::string &filename)
     // End effect modules & parameters
 
     // More defaults modules
+    s_buf = "\tGain_Module 0x4 create :parameter_values \"0.000000:0.000000\" :is_default 1 :chain 0x2 :active 1\n";
+    fputs(s_buf.c_str(), fn);
+
     s_buf = "\tMeter_Module 0x5 create :is_default 1 :chain 0x2 :active 1\n";
     fputs(s_buf.c_str(), fn);
 
@@ -490,84 +441,139 @@ RKR::export_to_carla(const std::string &filename)
  */
 void
 RKR::load_preset(const std::string &filename)
-{
-    FILE *fn;
-    char buf[256];
-
-    PresetBankStruct preset_loaded;
-    
-    if ((fn = fopen(filename.c_str(), "r")) == NULL)
+{ 
+    std::ifstream file(filename);
+    if (!file.is_open())
     {
-        File_To_Load.clear();
         Handle_Message(14, filename);
         return;
     }
 
-    // This cycles through the first 14 lines which should always exist.
-    // Will set fgets to the next item which is order for loading.
-    for (int i = 0; i < 14; i++)
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+
+    rkr_restore_state(buffer.str());
+}
+
+int
+RKR::rkr_save_state(std::string &s_buf)
+{
+    // Update active preset for any user changes
+    refresh_active_preset();
+
+    // Copy active preset for file operations
+    PresetBankStruct Save_Preset = Active_Preset;
+
+    // Program release version = 0
+    s_buf += VERSION;
+    s_buf += "\n";
+
+    // Author = 1
+    if (strlen(Save_Preset.Author) != 0)
     {
-        memset(buf, 0, sizeof (buf));
-        
-        if (fgets(buf, sizeof buf, fn) == NULL)
+        s_buf += Save_Preset.Author;
+        s_buf += "\n";
+    }
+    else
+    {
+        if (strlen(Config.UserRealName) != 0)
         {
-            File_To_Load.clear();
-            Handle_Message(14, filename);
-            fclose(fn);
-            return;
+            s_buf += Config.UserRealName;
+            s_buf += "\n";
+        }
+        else
+        {
+            s_buf += getenv("USER");
+            s_buf += "\n";
         }
     }
 
-    // Order
+    // Preset Name = 2
+    s_buf += Save_Preset.Preset_Name;
+    s_buf += "\n";
+
+    // Master control = 3
+    s_buf += NTS(Save_Preset.Input_Gain);
+    s_buf += ",";
+    s_buf += NTS(Save_Preset.Master_Volume);
+    s_buf += ",";
+    s_buf += NTS(Save_Preset.Fraction_Bypass);
+    s_buf += ",";
+    s_buf += NTS(Save_Preset.FX_Master_Active);
+    s_buf += "\n";
+
+    // Effect parameters = 4
+    std::string s_temp;
+    for (int order = 0; order < C_NUMBER_ORDERED_EFFECTS; order++)
+    {
+        int effect = Save_Preset.Effect_Params[EFX_ORDER][order];
+        s_temp.clear();
+
+        get_effect_parameters(s_temp, effect);
+        s_buf += s_temp;
+    }
+
+    // Effect Order = 4 + 10 = 14
+    for(int i = 0; i < 10; i++)
+    {
+        s_buf += NTS(Save_Preset.Effect_Params[EFX_ORDER][i]);
+        if(i < 9)
+        {
+            s_buf += ",";
+        }
+    }
+    s_buf += "\n";
+
+    // MIDI learn table = 15
+    for (int i = 0; i < 128; i++)
+    {
+        s_temp.clear();
+
+        for(int j = 0; j < 20; j++)
+        {
+            s_temp += NTS(Save_Preset.XUserMIDI[i][j]);
+
+            if(j < 19)
+            {
+                s_temp += ",";
+            }
+        }
+
+        s_temp += "\n";
+
+        s_buf += s_temp;
+    }
+
+#if 0
+    // LV2 state version
+    s_buf = NTS(C_LV2_STATE_VERSION);
+    s_buf += "\n";
+#endif
+
+    return s_buf.length() + 1;
+}
+
+void
+RKR::rkr_restore_state(const std::string &s_buf)
+{
+    char buf[256];
+    PresetBankStruct preset_loaded;
+
+    std::stringstream ss(s_buf);
+    std::string segment;
+    std::vector<std::string> segments;
+
+    while(std::getline(ss, segment))    // Use getline reads to \n
+    {
+        segments.push_back(segment);
+    }
+
+    // Program release version = 0
+    printf("Program release version = %s\n", segments[RKR_VERSION].c_str());
+
+    // Author = 1
     memset(buf, 0, sizeof (buf));
-
-    if (fgets(buf, sizeof buf, fn) == NULL)
-    {
-        File_To_Load.clear();
-        Handle_Message(15, filename);
-        fclose(fn);
-        return;
-    }
-
-    // Parse the effect order into the order array
-    int order[10];
-    sscanf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-           &order[0], &order[1], &order[2], &order[3], &order[4],
-           &order[5], &order[6], &order[7], &order[8], &order[9]);
-
-    // Close the file to start at the top again...
-    // This is done since the effect order comes after the individual
-    // effect parameters in the file. We do not know which effects
-    // the parameters apply until we get the order first, uuuuuggghhlllyyy!!!!
-    fclose(fn);
-
-    if ((fn = fopen(filename.c_str(), "r")) == NULL)
-    {
-        return;
-    }
-
-    // Program version
-    memset(buf, 0, sizeof (buf));
-
-    if (fgets(buf, sizeof buf, fn) == NULL)
-    {
-        File_To_Load.clear();
-        Handle_Message(16, filename);
-        fclose(fn);
-        return;
-    }
-
-    // Author
-    memset(buf, 0, sizeof (buf));
-
-    if (fgets(buf, sizeof buf, fn) == NULL)
-    {
-        File_To_Load.clear();
-        Handle_Message(17, filename);
-        fclose(fn);
-        return;
-    }
-
+    memcpy(buf, segments[RKR_AUTHOR].c_str(), segments[RKR_AUTHOR].size());
     for (int i = 0; i < 64; i++)
     {
         if (buf[i] > 20)        // remove LF '\n'
@@ -576,17 +582,9 @@ RKR::load_preset(const std::string &filename)
         }
     }
 
-    // Preset Name
+    // Preset Name = 2
     memset(buf, 0, sizeof (buf));
-
-    if (fgets(buf, sizeof buf, fn) == NULL)
-    {
-        File_To_Load.clear();
-        Handle_Message(18, filename);
-        fclose(fn);
-        return;
-    }
-
+    memcpy(buf, segments[RKR_PRESET_NAME].c_str(), segments[RKR_PRESET_NAME].size());
     for (int i = 0; i < 64; i++)
     {
         if (buf[i] > 20)        // remove LF '\n'
@@ -595,65 +593,41 @@ RKR::load_preset(const std::string &filename)
         }
     }
 
-    // Master control
+    // Master control = 3
     memset(buf, 0, sizeof (buf));
-
-    if (fgets(buf, sizeof buf, fn) == NULL)
-    {
-        File_To_Load.clear();
-        Handle_Message(19, filename);
-        fclose(fn);
-        return;
-    }
-
+    memcpy(buf, segments[RKR_MASTER_CTRL].c_str(), segments[RKR_MASTER_CTRL].size());
     float in_vol, out_vol; in_vol = out_vol = 0.0;
     float balance = 1.0f;
 
     sscanf(buf, "%f,%f,%f,%d\n", &in_vol, &out_vol, &balance, &FX_Master_Active_Reset);
 
-    if (!Config.preserve_master)
-    {
-        preset_loaded.Fraction_Bypass = balance;
-        preset_loaded.Input_Gain = in_vol;
-        preset_loaded.Master_Volume = out_vol;
-    }
-    else    // Use current Master
-    {
-        preset_loaded.Fraction_Bypass = Active_Preset.Fraction_Bypass;
-        preset_loaded.Input_Gain = Active_Preset.Input_Gain;
-        preset_loaded.Master_Volume = Active_Preset.Master_Volume;
-    }
+    preset_loaded.Fraction_Bypass = balance;
+    preset_loaded.Input_Gain = in_vol;
+    preset_loaded.Master_Volume = out_vol;
+ 
+    // Effect Order = 14
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[RKR_EFX_ORDER].c_str(), segments[RKR_EFX_ORDER].size());
 
-    // Effect parameters
+    int order[10];
+    sscanf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+           &order[0], &order[1], &order[2], &order[3], &order[4],
+           &order[5], &order[6], &order[7], &order[8], &order[9]);
+ 
+    // Effect parameters = 4
     for (int i = 0; i < 10; i++)
     {
         int effect = order[i];  // This is why we had to load the order first!!!
 
         memset(buf, 0, sizeof (buf));
-
-        if (fgets(buf, sizeof buf, fn) == NULL)
-        {
-            File_To_Load.clear();
-            Handle_Message(19, filename);
-            fclose(fn);
-            return;
-        }
+        memcpy(buf, segments[RKR_EFX_PARAMS + i].c_str(), segments[RKR_EFX_PARAMS + i].size());
 
         apply_effect_parameters(buf, effect, preset_loaded);
     }
 
-    // Effect order... again!!
+    /* Get the order again to apply it */
     memset(buf, 0, sizeof (buf));
-
-    if (fgets(buf, sizeof buf, fn) == NULL)
-    {
-        File_To_Load.clear();
-        Handle_Message(15, filename);
-        fclose(fn);
-        return;
-    }
-
-    // Apply the order
+    memcpy(buf, segments[RKR_EFX_ORDER].c_str(), segments[RKR_EFX_ORDER].size());
     sscanf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
            &preset_loaded.Effect_Params[EFX_ORDER][0], &preset_loaded.Effect_Params[EFX_ORDER][1],
            &preset_loaded.Effect_Params[EFX_ORDER][2], &preset_loaded.Effect_Params[EFX_ORDER][3],
@@ -661,18 +635,11 @@ RKR::load_preset(const std::string &filename)
            &preset_loaded.Effect_Params[EFX_ORDER][6], &preset_loaded.Effect_Params[EFX_ORDER][7],
            &preset_loaded.Effect_Params[EFX_ORDER][8], &preset_loaded.Effect_Params[EFX_ORDER][9]);
 
-    // MIDI learn table
+    // MIDI learn table = 15
     for (int i = 0; i < 128; i++)
     {
         memset(buf, 0, sizeof (buf));
-
-        if (fgets(buf, sizeof buf, fn) == NULL)
-        {
-            File_To_Load.clear();
-            Handle_Message(20, filename);
-            fclose(fn);
-            return;
-        }
+        memcpy(buf, segments[RKR_MIDI_LEARN + i].c_str(), segments[RKR_MIDI_LEARN + i].size());
 
         sscanf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
                &preset_loaded.XUserMIDI[i][0], &preset_loaded.XUserMIDI[i][1],
@@ -687,12 +654,688 @@ RKR::load_preset(const std::string &filename)
                &preset_loaded.XUserMIDI[i][18], &preset_loaded.XUserMIDI[i][19]);
     }
 
-    fclose(fn);
+#if 0
+    // LV2 state version
+    if( std::stoi(segments[0]) != C_LV2_STATE_VERSION)
+    {
+        printf("Invalid State Version %s\n", segments[0].c_str());
+    }
+#endif
 
     // Copy the loaded preset to Main window
     Active_Preset = preset_loaded;
 
     set_audio_paramters();
+}
+
+int
+RKR::LV2_save_preferences(std::string &s_buf)
+{
+    // Look Tab
+    s_buf += std::to_string(Config.deachide);
+    s_buf += ",";
+    s_buf += std::to_string(Config.scalable);
+    s_buf += "\n";
+
+    // Audio Tab
+    s_buf += std::to_string(Config.DC_Offset);
+    s_buf += ",";
+    s_buf += std::to_string(Config.preserve_master);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Tap_Updated);
+    s_buf += ",";
+    s_buf += std::to_string(Config.flpos);          // Limiter before output volume
+    s_buf += ",";
+    s_buf += std::to_string(Config.db6booster);
+    s_buf += ",";
+    // Master Up-sampling are below as they need reset
+    // Looper size also needs reset below
+    s_buf += std::to_string(Config.Metro_Vol);
+    s_buf += ",";
+    s_buf += std::to_string(Config.aFreq);   // Tuner Calibration - float
+    s_buf += ",";
+    s_buf += std::to_string(Config.rtrig);   // Tuner Note Trigger -float
+    s_buf += ",";
+    s_buf += std::to_string(Config.RCOpti_Harm);
+    s_buf += ",";
+    s_buf += std::to_string(Config.RCOpti_Stereo);
+    s_buf += ",";
+    s_buf += std::to_string(Config.RCOpti_Ring);
+    s_buf += "\n";
+
+    // Master need reset
+    s_buf += std::to_string(Config.UpAmo);
+    s_buf += ",";
+    s_buf += std::to_string(Config.upsample);
+    s_buf += ",";
+    s_buf += std::to_string(Config.UpQual);
+    s_buf += ",";
+    s_buf += std::to_string(Config.DownQual);
+    s_buf += ",";
+    s_buf += std::to_string(Config.looper_size);     // float
+    s_buf += "\n";
+    // Master end reset
+    // End Audio tab
+
+    // Quality Tab - Need Reset
+    s_buf += std::to_string(Config.HarQual);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Har_Down);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Har_U_Q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Har_D_Q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Rev_Down);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Rev_U_Q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Rev_D_Q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Con_Down);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Con_U_Q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Con_D_Q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.SeqQual);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Seq_Down);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Seq_U_Q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Seq_D_Q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.ShiQual);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Shi_Down);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Shi_U_Q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Shi_D_Q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.VocBands);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Voc_Down);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Voc_U_Q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Voc_D_Q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.SteQual);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Ste_Down);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Ste_U_Q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Ste_D_Q);
+    s_buf += "\n";
+
+    // Waveshape Resampling
+    s_buf += std::to_string(Config.Dist_res_amount);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Dist_up_q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Dist_down_q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Ovrd_res_amount);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Ovrd_up_q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Ovrd_down_q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Dere_res_amount);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Dere_up_q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Dere_down_q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.DBand_res_amount);
+    s_buf += ",";
+    s_buf += std::to_string(Config.DBand_up_q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.DBand_down_q);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Stomp_res_amount);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Stomp_up_q);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Stomp_down_q);
+    s_buf += "\n";
+    // End Quality Tab
+
+    // MIDI Tab
+    s_buf += std::to_string(Config.MIDI_In_Channel);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Harmonizer_MIDI_Channel);
+    s_buf += ",";
+    s_buf += std::to_string(Config.StereoHarm_MIDI_Channel);
+    s_buf += ",";
+    s_buf += std::to_string(Config.MIDIway);     // MIDI Implementation
+    s_buf += ",";
+    s_buf += std::to_string(Config.autoassign);
+    s_buf += ",";
+    s_buf += std::to_string(Config.custom_midi_table);   // Use custom midi table flag
+    s_buf += ",";
+    s_buf += std::to_string(Config.custom_midi_table_file);  // - Index
+    s_buf += "\n";
+    // End MIDI Tab
+
+    // MISC Tab
+    s_buf += std::to_string(Config.Disable_Warnings);
+    s_buf += ",";
+    s_buf += std::to_string(Config.t_timeout);
+    s_buf += ",";
+    s_buf += std::to_string(Config.ena_tool);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Focus_Delay);
+    s_buf += "\n";
+    // End MISC Tab
+
+    // User Tab
+    s_buf += Config.BankFilename;
+    s_buf += "\n";
+    s_buf += Config.UDirFilename;
+    s_buf += "\n";
+    s_buf += Config.UserRealName;
+    s_buf += "\n";
+    // End User Tab
+
+    // Main Window items
+    s_buf += std::to_string(active_bank);
+    s_buf += ",";
+    s_buf += std::to_string(booster);   // Not included in state save.-- float
+    s_buf += ",";
+    s_buf += std::to_string((int) Config.Analyzer_On_Off);  // bool
+    s_buf += ",";
+    s_buf += std::to_string( (int) Config.Scope_On_Off);    // bool
+    s_buf += ",";
+    s_buf += std::to_string(Config.Preset_Number); 
+    s_buf += ",";
+    s_buf += std::to_string(Tuner_Active);
+    s_buf += "\n";
+
+    //MIDIConverter
+    s_buf += std::to_string(Config.Midi_Out_Channel);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Trigger_Adjust);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Velocity_Adjust);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Converter_Octave);
+    s_buf += ",";
+    s_buf += std::to_string(MIDIConverter_Active);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Use_FFT);
+    s_buf += "\n";
+
+    //Metronome
+    s_buf += std::to_string(Metro_Active);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Metronome_Time);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Metro_Vol);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Metronome_Tempo);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Metronome_Sound);
+    s_buf += ",";
+    s_buf += std::to_string(Config.sw_stat);
+    s_buf += "\n";
+
+    //Tap Tempo
+    s_buf += std::to_string(Tap_Active);
+    s_buf += ",";
+    s_buf += std::to_string(Tap_Selection);
+    s_buf += ",";
+    s_buf += std::to_string(Tap_SetValue);
+    s_buf += "\n";
+//    s_buf += std::to_string(Tap_TempoSet);
+//    s_buf += "\n";
+    // End Main Window items
+
+    // Window sizes
+    s_buf += std::to_string(Config.Principal_X);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Principal_Y);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Principal_W);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Principal_H);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.BankWindow_X);
+    s_buf += ",";
+    s_buf += std::to_string(Config.BankWindow_Y);
+    s_buf += ",";
+    s_buf += std::to_string(Config.BankWindow_W);
+    s_buf += ",";
+    s_buf += std::to_string(Config.BankWindow_H);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Order_X);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Order_Y);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Order_W);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Order_H);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Settings_X);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Settings_Y);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Settings_W);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Settings_H);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Help_X);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Help_Y);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Help_W);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Help_H);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Help_TextSize);
+    s_buf += "\n";
+    
+ //   help_displayed = 0;  // For LV2 the UI is deleted so reset as not displayed
+
+    s_buf += std::to_string(Config.Random_X);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Random_Y);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Random_W);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Random_H);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Rand_Parameters);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Rand_Active);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Rand_Current);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Rand_Max);
+    s_buf += "\n";
+
+    s_buf += Config.Rand_Exclude;  //  Special case  - char [EFX_NUMBER_EFFECTS + 1]
+    s_buf += "\n";
+
+        // convert the asci char to string for the set 
+/*        std::string s;
+        for(int i = 0; i < EFX_NUMBER_EFFECTS; ++i)
+        {
+            if(FX_Excluded[i] == (char) 1)
+                Config.Rand_Exclude[i] = ASCII_One;
+            else
+                Config.Rand_Exclude[i] = ASCII_Space;
+        }
+*/
+    s_buf += std::to_string(Config.MIDI_Learn_X);
+    s_buf += ",";
+    s_buf += std::to_string(Config.MIDI_Learn_Y);
+    s_buf += ",";
+    s_buf += std::to_string(Config.MIDI_Learn_W);
+    s_buf += ",";
+    s_buf += std::to_string(Config.MIDI_Learn_H);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Trigger_X);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Trigger_Y);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Trigger_W);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Trigger_H);
+    s_buf += ",";
+    s_buf += std::to_string(Aux_Source);
+    s_buf += ",";
+    s_buf += std::to_string(Aux_Gain);
+    s_buf += ",";
+    s_buf += std::to_string(Aux_Threshold);
+    s_buf += ",";
+    s_buf += std::to_string(Aux_MIDI);
+    s_buf += ",";
+    s_buf += std::to_string(Aux_Minimum);
+    s_buf += ",";
+    s_buf += std::to_string(Aux_Maximum);
+    s_buf += "\n";
+
+    s_buf += std::to_string(Config.Delay_X);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Delay_Y);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Delay_W);
+    s_buf += ",";
+    s_buf += std::to_string(Config.Delay_H);
+    s_buf += "\n";
+    // TODO need to save the delay gui table for gui hide and return.
+
+    return s_buf.length() + 1;
+}
+
+void
+RKR::LV2_restore_preferences(const std::string &s_buf)
+{
+    char buf[256];
+    std::stringstream ss(s_buf);
+    std::string segment;
+    std::vector<std::string> segments;
+
+    while(std::getline(ss, segment))    // Use getline reads to \n
+    {
+        segments.push_back(segment);
+    }
+
+    // ************* Settings/Look ******************
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_LOOK].c_str(), segments[PREFS_LOOK].size());
+    
+    sscanf(buf, "%d,%d\n", &Config.deachide, &Config.scalable);
+    // End Settings/Look
+
+    // ************ Settings/Audio *******************
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_AUDIO].c_str(), segments[PREFS_AUDIO].size());
+    
+    sscanf(buf, "%d,%d,%d,%d,%d,%d,%f,%f,%d,%d,%d\n",
+            &Config.DC_Offset, &Config.preserve_master,
+            &Config.Tap_Updated, &Config.flpos, &Config.db6booster, 
+            &Config.Metro_Vol, &Config.aFreq, &Config.rtrig, 
+            &Config.RCOpti_Harm, &Config.RCOpti_Stereo, &Config.RCOpti_Ring);
+
+    // Master need reset - 3
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_MASTER].c_str(), segments[PREFS_MASTER].size());
+    sscanf(buf, "%d,%d,%d,%d,%f\n", &Config.UpAmo, &Config.upsample,
+            &Config.UpQual, &Config.DownQual, &Config.looper_size);
+    // End Settings/Audio
+
+    // ************ Settings/Quality ******************
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_HARM].c_str(), segments[PREFS_HARM].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.HarQual, &Config.Har_Down,
+            &Config.Har_U_Q, &Config.Har_D_Q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_REVTRON].c_str(), segments[PREFS_REVTRON].size());
+    sscanf(buf, "%d,%d,%d\n", &Config.Rev_Down, &Config.Rev_U_Q,
+            &Config.Rev_D_Q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_CONVO].c_str(), segments[PREFS_CONVO].size());
+    sscanf(buf, "%d,%d,%d\n", &Config.Con_Down, &Config.Con_U_Q,
+            &Config.Con_D_Q);
+    
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_SEQUENCE].c_str(), segments[PREFS_SEQUENCE].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.SeqQual, &Config.Seq_Down,
+            &Config.Seq_U_Q, &Config.Seq_D_Q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_SHIFTER].c_str(), segments[PREFS_SHIFTER].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.ShiQual, &Config.Shi_Down,
+            &Config.Shi_U_Q, &Config.Shi_D_Q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_VOCODER].c_str(), segments[PREFS_VOCODER].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.VocBands, &Config.Voc_Down,
+            &Config.Voc_U_Q, &Config.Voc_D_Q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_STEREO_HARM].c_str(), segments[PREFS_STEREO_HARM].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.SteQual, &Config.Ste_Down,
+            &Config.Ste_U_Q, &Config.Ste_D_Q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_DIST].c_str(), segments[PREFS_DIST].size());
+    sscanf(buf, "%d,%d,%d\n", &Config.Dist_res_amount, &Config.Dist_up_q,
+            &Config.Dist_down_q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_OVRD].c_str(), segments[PREFS_OVRD].size());
+    sscanf(buf, "%d,%d,%d\n", &Config.Ovrd_res_amount, &Config.Ovrd_up_q,
+            &Config.Ovrd_down_q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_DERELICT].c_str(), segments[PREFS_DERELICT].size());
+    sscanf(buf, "%d,%d,%d\n", &Config.Dere_res_amount, &Config.Dere_up_q,
+            &Config.Dere_down_q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_DBAND].c_str(), segments[PREFS_DBAND].size());
+    sscanf(buf, "%d,%d,%d\n", &Config.DBand_res_amount, &Config.DBand_up_q,
+            &Config.DBand_down_q);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_STOMP].c_str(), segments[PREFS_STOMP].size());
+    sscanf(buf, "%d,%d,%d\n", &Config.Stomp_res_amount, &Config.Stomp_up_q,
+            &Config.Stomp_down_q);
+    // End Settings/Quality
+
+    // ************ Settings/MIDI *****************
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_MIDI_TAB].c_str(), segments[PREFS_MIDI_TAB].size());
+    sscanf(buf, "%d,%d,%d,%d,%d,%d,%d\n", &Config.MIDI_In_Channel, &Config.Harmonizer_MIDI_Channel,
+            &Config.StereoHarm_MIDI_Channel, &Config.MIDIway, &Config.autoassign,
+            &Config.custom_midi_table, &Config.custom_midi_table_file);
+    // End Settings/MIDI
+
+    // *************** Settings/Misc **********************
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_MISC_TAB].c_str(), segments[PREFS_MISC_TAB].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.Disable_Warnings, &Config.t_timeout,
+            &Config.ena_tool, &Config.Focus_Delay);
+    // End Settings/Misc
+
+    // ******************* Settings/User *******************
+    // Get user default bank file from Settings/Bank/ --Bank Filename
+    memset(buf, 0, sizeof (buf));
+    memset(Config.BankFilename, 0, sizeof(Config.BankFilename));
+    memcpy(buf, segments[PREFS_BANK_FILE_NAME].c_str(), segments[PREFS_BANK_FILE_NAME].size());
+    for (int i = 0; i < 128; i++)
+    {
+        if (buf[i] > 20)        // remove LF '\n'
+        {
+            Config.BankFilename[i] = buf[i];
+        }
+    }
+
+    memset(buf, 0, sizeof (buf));
+    memset(Config.UDirFilename, 0, sizeof(Config.UDirFilename));
+    memcpy(buf, segments[PREFS_USER_DIRECTORY].c_str(), segments[PREFS_USER_DIRECTORY].size());
+    for (int i = 0; i < 128; i++)
+    {
+        if (buf[i] > 20)        // remove LF '\n'
+        {
+            Config.UDirFilename[i] = buf[i];
+        }
+    }
+    global_user_directory = Config.UDirFilename;
+
+    memset(buf, 0, sizeof (buf));
+    memset(Config.UserRealName, 0, sizeof(Config.UserRealName));
+    memcpy(buf, segments[PREFS_USER_NAME].c_str(), segments[PREFS_USER_NAME].size());
+    for (int i = 0; i < 128; i++)
+    {
+        if (buf[i] > 20)        // remove LF '\n'
+        {
+            Config.UserRealName[i] = buf[i];
+        }
+    }
+    // End Settings/User
+
+    // Main window
+    int Analyzer, Scope;
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_MAIN].c_str(), segments[PREFS_MAIN].size());
+    sscanf(buf, "%d,%f,%d,%d,%d,%d\n", &Config.active_bank, &Config.booster,
+            &Analyzer, &Scope, &Config.Preset_Number, &Config.Tuner_On_Off);
+
+    Config.Analyzer_On_Off = (bool) Analyzer;
+    Config.Scope_On_Off = (bool) Scope;
+    Config.Preset_Number = 1;  // For LV2 we don't load the preset
+
+    // MIDIConverter
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_MIDI_CONVERT].c_str(), segments[PREFS_MIDI_CONVERT].size());
+    sscanf(buf, "%d,%d,%d,%d,%d,%d\n", &Config.Midi_Out_Channel, &Config.Trigger_Adjust,
+            &Config.Velocity_Adjust, &Config.Converter_Octave, &Config.MIDI_Converter_On_Off,
+            &Config.Use_FFT);
+
+    // Metronome
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_METRONOME].c_str(), segments[PREFS_METRONOME].size());
+    sscanf(buf, "%d,%d,%d,%d,%d,%d\n", &Config.Metronome_On_Off, &Config.Metronome_Time,
+            &Config.Metronome_Volume, &Config.Metronome_Tempo, &Config.Metronome_Sound, 
+            &Config.sw_stat);
+
+    // Tap Tempo
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_TAP_TEMPO].c_str(), segments[PREFS_TAP_TEMPO].size());
+    sscanf(buf, "%d,%d,%d\n", &Config.TapTempo_On_Off, &Config.Tap_Selection, &Config.Tap_SetValue);
+
+    //s_buf += std::to_string(Tap_TempoSet);    // FIXME check
+    // End Main window
+
+    // ************** Window Sizes *****************
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_PRINCIPAL].c_str(), segments[PREFS_PRINCIPAL].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.Principal_X, &Config.Principal_Y,
+            &Config.Principal_W, &Config.Principal_H);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_BANK].c_str(), segments[PREFS_BANK].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.BankWindow_X, &Config.BankWindow_Y,
+            &Config.BankWindow_W, &Config.BankWindow_H);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_ORDER].c_str(), segments[PREFS_ORDER].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.Order_X, &Config.Order_Y,
+            &Config.Order_W, &Config.Order_H);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_SETTINGS].c_str(), segments[PREFS_SETTINGS].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.Settings_X, &Config.Settings_Y,
+            &Config.Settings_W, &Config.Settings_H);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_HELP].c_str(), segments[PREFS_HELP].size());
+    sscanf(buf, "%d,%d,%d,%d,%d\n", &Config.Help_X, &Config.Help_Y, &Config.Help_W,
+            &Config.Help_H, &Config.Help_TextSize);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_RANDOM].c_str(), segments[PREFS_RANDOM].size());
+    sscanf(buf, "%d,%d,%d,%d,%d,%d,%d,%d\n", &Config.Random_X, &Config.Random_Y,
+            &Config.Random_W, &Config.Random_H, &Config.Rand_Parameters,
+            &Config.Rand_Active, &Config.Rand_Current, &Config.Rand_Max);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_RAND_EXCLUDE].c_str(), segments[PREFS_RAND_EXCLUDE].size());
+    for (int i = 0; i < (EFX_NUMBER_EFFECTS + 1); i++)
+    {
+        if (buf[i] > 20)        // remove LF '\n'
+        {
+            Config.Rand_Exclude[i] = buf[i];
+        }
+    }
+//    memset(temp, 0, sizeof (temp));
+ //   Config.Rand_Exclude, temp, EFX_NUMBER_EFFECTS + 1);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_MIDI_LEARN].c_str(), segments[PREFS_MIDI_LEARN].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.MIDI_Learn_X, &Config.MIDI_Learn_Y,
+            &Config.MIDI_Learn_W, &Config.MIDI_Learn_H);
+
+    // Trigger
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_TRIGGER].c_str(), segments[PREFS_TRIGGER].size());
+    sscanf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", &Config.Trigger_X, &Config.Trigger_Y,
+            &Config.Trigger_W, &Config.Trigger_H, &Config.Aux_Source, &Config.Aux_Gain,
+            &Config.Aux_Threshold, &Config.Aux_MIDI, &Config.Aux_Minimum, &Config. Aux_Maximum);
+
+    memset(buf, 0, sizeof (buf));
+    memcpy(buf, segments[PREFS_DELAY].c_str(), segments[PREFS_DELAY].size());
+    sscanf(buf, "%d,%d,%d,%d\n", &Config.Delay_X, &Config.Delay_Y, &Config.Delay_W,
+            &Config.Delay_H);
+}
+
+void
+RKR::check_preferences_changed(std::vector<int> &s_vect)
+{
+    // Audio Tab
+    s_vect.push_back(Config.UpAmo);
+    s_vect.push_back(Config.upsample);
+    s_vect.push_back(Config.UpQual);
+    s_vect.push_back(Config.DownQual);
+    s_vect.push_back(Config.looper_size);
+
+    // Quality Tab
+    s_vect.push_back(Config.HarQual);
+    s_vect.push_back(Config.Har_Down);
+    s_vect.push_back(Config.Har_U_Q);
+    s_vect.push_back(Config.Har_D_Q);
+
+    s_vect.push_back(Config.Rev_Down);
+    s_vect.push_back(Config.Rev_U_Q);
+    s_vect.push_back(Config.Rev_D_Q);
+
+    s_vect.push_back(Config.Con_Down);
+    s_vect.push_back(Config.Con_U_Q);
+    s_vect.push_back(Config.Con_D_Q);
+
+    s_vect.push_back(Config.SeqQual);
+    s_vect.push_back(Config.Seq_Down);
+    s_vect.push_back(Config.Seq_U_Q);
+    s_vect.push_back(Config.Seq_D_Q);
+
+    s_vect.push_back(Config.ShiQual);
+    s_vect.push_back(Config.Shi_Down);
+    s_vect.push_back(Config.Shi_U_Q);
+    s_vect.push_back(Config.Shi_D_Q);
+
+    s_vect.push_back(Config.VocBands);
+    s_vect.push_back(Config.Voc_Down);
+    s_vect.push_back(Config.Voc_U_Q);
+    s_vect.push_back(Config.Voc_D_Q);
+
+    s_vect.push_back(Config.SteQual);
+    s_vect.push_back(Config.Ste_Down);
+    s_vect.push_back(Config.Ste_U_Q);
+    s_vect.push_back(Config.Ste_D_Q);
+
+    s_vect.push_back(Config.Dist_res_amount);
+    s_vect.push_back(Config.Dist_up_q);
+    s_vect.push_back(Config.Dist_down_q);
+
+    s_vect.push_back(Config.Ovrd_res_amount);
+    s_vect.push_back(Config.Ovrd_up_q);
+    s_vect.push_back(Config.Ovrd_down_q);
+
+    s_vect.push_back(Config.Dere_res_amount);
+    s_vect.push_back(Config.Dere_up_q);
+    s_vect.push_back(Config.Dere_down_q);
+
+    s_vect.push_back(Config.DBand_res_amount);
+    s_vect.push_back(Config.DBand_up_q);
+    s_vect.push_back(Config.DBand_down_q);
+
+    s_vect.push_back(Config.Stomp_res_amount);
+    s_vect.push_back(Config.Stomp_up_q);
+    s_vect.push_back(Config.Stomp_down_q);
 }
 
 /**
@@ -709,15 +1352,15 @@ RKR::set_audio_paramters()
     // Copy the file names to the audio effects
     Convolotron *Efx_Convolotron = static_cast<Convolotron*>(Rack_Effects[EFX_CONVOLOTRON]);
     memset(Efx_Convolotron->Filename, 0, sizeof (Efx_Convolotron->Filename));
-    strcpy(Efx_Convolotron->Filename, Active_Preset.ConvoFiname);
+    RKRP::strlcpy(Efx_Convolotron->Filename, Active_Preset.ConvoFiname, sizeof(Efx_Convolotron->Filename));
 
     Reverbtron *Efx_Reverbtron = static_cast<Reverbtron*>(Rack_Effects[EFX_REVERBTRON]);
     memset(Efx_Reverbtron->Filename, 0, sizeof (Efx_Reverbtron->Filename));
-    strcpy(Efx_Reverbtron->Filename, Active_Preset.RevFiname);
+    RKRP::strlcpy(Efx_Reverbtron->Filename, Active_Preset.RevFiname, sizeof(Efx_Reverbtron->Filename));
 
     Echotron *Efx_Echotron = static_cast<Echotron*>(Rack_Effects[EFX_ECHOTRON]);
     memset(Efx_Echotron->Filename, 0, sizeof (Efx_Echotron->Filename));
-    strcpy(Efx_Echotron->Filename, Active_Preset.EchoFiname);
+    RKRP::strlcpy(Efx_Echotron->Filename, Active_Preset.EchoFiname, sizeof(Efx_Echotron->Filename));
     
     // The main window effect order
     for (int i = 0; i < C_NUMBER_ORDERED_EFFECTS; i++)
@@ -733,7 +1376,7 @@ RKR::set_audio_paramters()
     // This is beneficial for User editing and feedback, but not for fast preset changes
     if(Gui_Shown)
     {
-        for (int all_efx = 0; all_efx < C_NUMBER_EFFECTS; all_efx++)
+        for (int all_efx = 0; all_efx < EFX_NUMBER_EFFECTS; all_efx++)
         {
             EFX_Active[all_efx] = Active_Preset.Effect_Params[all_efx][C_BYPASS];
 
@@ -743,7 +1386,25 @@ RKR::set_audio_paramters()
 
             for (int efx_params = 0; efx_params < EFX_Param_Size[all_efx]; efx_params++)
             {
-                if(all_efx == EFX_LOOPER)
+                // For any effect after EFX_INFINITY, the effect parameters may all contain 0 if loaded from
+                // a bank file since they were unused prior to adding EFX_RESSOLUTION. For EFX_RESSOLUTION
+                // we can check the LF0_Type for 0, which is invalid. In this case, we can bypass loading all
+                // the 0 unused settings and keep the EFX_RESSOLUTION default settings.
+                // There is no need to make this same check for optimized audio (!Gui_Shown) since it is
+                // only for Active effects.
+                if(all_efx == EFX_RESSOLUTION)
+                {
+                    // Is this from a previously unused effect slot from a bank file?
+                    if(Active_Preset.Effect_Params[EFX_RESSOLUTION][Ressol_LFO_Type] == 0)
+                    {
+                        break;  // yes it is, so just bypass loading from the bank
+                    }
+                    else    // normal loading
+                    {
+                        Rack_Effects[all_efx]->changepar(efx_params, Active_Preset.Effect_Params[all_efx][efx_params]);
+                    }
+                }
+                else if(all_efx == EFX_LOOPER)
                 {
                     Efx_Looper->set_value(efx_params, Active_Preset.Effect_Params[EFX_LOOPER][efx_params]);
                 }
@@ -779,7 +1440,7 @@ RKR::set_audio_paramters()
         // For each item on the main rack, check for a match to the efx_order
         for (int ordered_efx = 0; ordered_efx < C_NUMBER_ORDERED_EFFECTS; ordered_efx++)
         {
-            for (int all_efx = 0; all_efx < C_NUMBER_EFFECTS; all_efx++)
+            for (int all_efx = 0; all_efx < EFX_NUMBER_EFFECTS; all_efx++)
             {
                 // Is the effect one of the ordered?
                 if(efx_order[ordered_efx] == all_efx)
@@ -840,7 +1501,8 @@ RKR::load_custom_MIDI_table_preset_names()
     {
         for (int j = 1; j <= 60; j++)
         {
-            strcpy(MIDI_Table_Bank_Preset_Names[k][j].Preset_Name,  Bank_Vector[k].Bank[j].Preset_Name);
+            RKRP::strlcpy(MIDI_Table_Bank_Preset_Names[k][j].Preset_Name,
+                    Bank_Vector[k].Bank[j].Preset_Name, sizeof(MIDI_Table_Bank_Preset_Names[k][j].Preset_Name));
         }
     }
 }
@@ -910,10 +1572,11 @@ RKR::revert_file_to_bank(int lv_revert[C_MAX_EFFECTS][C_MAX_PARAMETERS], int siz
         EFX_COMPBAND,
         EFX_OPTICALTREM,
         EFX_VIBE,
-        EFX_INFINITY,       // 47
+        EFX_INFINITY,
+        EFX_RESSOLUTION,    // 48
 
         // offset by -1 for order moved to 69
-        47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+        48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
         60, 61, 62, 63, 64, 65, 66, 67, 68
     };
 
@@ -934,7 +1597,7 @@ RKR::revert_file_to_bank(int lv_revert[C_MAX_EFFECTS][C_MAX_PARAMETERS], int siz
     }
     
     // Clear the bank array.
-    memset(lv_revert, 0, sizeof (size));
+    memset(lv_revert, 0, size);
     
     // Put the reverted temp array into the bank array.
     for(int i = 0; i < C_MAX_EFFECTS; i++)
@@ -1017,7 +1680,8 @@ RKR::convert_bank_to_file(int lv_convert[C_MAX_EFFECTS][C_MAX_PARAMETERS], int s
         LV_COMPBAND,
         LV_OPTICALTREM,
         LV_VIBE,
-        LV_INFINITY        // 47
+        LV_INFINITY,
+        LV_RESSOLUTION     // 48
     };
 
     // Table to convert program EFX_Index to LV_File_Index.
@@ -1070,9 +1734,10 @@ RKR::convert_bank_to_file(int lv_convert[C_MAX_EFFECTS][C_MAX_PARAMETERS], int s
         LV_OPTICALTREM,
         LV_VIBE,
         LV_INFINITY,       // 46
+        LV_RESSOLUTION,    // 47
 
         // Offset by +1 for order inserted at 10
-        48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
+        49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
         59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
 
         LV_ORDER           // 69
@@ -1095,7 +1760,7 @@ RKR::convert_bank_to_file(int lv_convert[C_MAX_EFFECTS][C_MAX_PARAMETERS], int s
     }
     
     // Clear the bank array.
-    memset(lv_convert, 0, sizeof (size));
+    memset(lv_convert, 0, size);
     
     // Put the converted temp array into the bank array.
     for(int i = 0; i < C_MAX_EFFECTS; i++)
@@ -1397,12 +2062,16 @@ RKR::new_preset()
     }
 
     Active_Preset.new_preset();
-    
+
     // Copy the user name from settings
     strncpy(Active_Preset.Author, Config.UserRealName, sizeof(Active_Preset.Author) - 1);
 
-    // Set the Master to OFF
+    // Set the Master to OFF for standalone and ON for LV2
+#ifdef RKR_PLUS_LV2
+    FX_Master_Active_Reset = 1;
+#else
     FX_Master_Active_Reset = 0;
+#endif
 
     // Apply all the above settings to each effect, etc.
     set_audio_paramters();
@@ -1499,7 +2168,7 @@ RKR::refresh_active_preset()
 {
     // Update all effect parameters into Active_Preset from audio classes
     // since they may have been changed by user.
-    for (int k = 0; k < C_NUMBER_EFFECTS; k++)
+    for (int k = 0; k < EFX_NUMBER_EFFECTS; k++)
     {
         for (int j = 0; j < EFX_Param_Size[k]; j++)
         {
@@ -1514,7 +2183,7 @@ RKR::refresh_active_preset()
     }
 
     // Copy the current bypass state
-    for(int j = 0; j < C_NUMBER_EFFECTS; j++)
+    for(int j = 0; j < EFX_NUMBER_EFFECTS; j++)
     {
         Active_Preset.Effect_Params[j][C_BYPASS] = EFX_Active[j];
     }
@@ -1522,15 +2191,15 @@ RKR::refresh_active_preset()
     // Update filenames for Convolotron, Echotron, Reverbtron to Active_Preset
     Convolotron *Efx_Convolotron = static_cast<Convolotron*>(Rack_Effects[EFX_CONVOLOTRON]);
     memset(Active_Preset.ConvoFiname, 0, sizeof (Active_Preset.ConvoFiname));
-    strcpy(Active_Preset.ConvoFiname, Efx_Convolotron->Filename);
+    RKRP::strlcpy(Active_Preset.ConvoFiname, Efx_Convolotron->Filename, sizeof(Active_Preset.ConvoFiname));
     
     Reverbtron *Efx_Reverbtron = static_cast<Reverbtron*>(Rack_Effects[EFX_REVERBTRON]);
     memset(Active_Preset.RevFiname, 0, sizeof (Active_Preset.RevFiname));
-    strcpy(Active_Preset.RevFiname, Efx_Reverbtron->Filename);
+    RKRP::strlcpy(Active_Preset.RevFiname, Efx_Reverbtron->Filename, sizeof(Active_Preset.RevFiname));
 
     Echotron *Efx_Echotron = static_cast<Echotron*>(Rack_Effects[EFX_ECHOTRON]);
     memset(Active_Preset.EchoFiname, 0, sizeof (Active_Preset.EchoFiname));
-    strcpy(Active_Preset.EchoFiname, Efx_Echotron->Filename);
+    RKRP::strlcpy(Active_Preset.EchoFiname, Efx_Echotron->Filename, sizeof(Active_Preset.EchoFiname));
 }
 
 /**
@@ -1545,11 +2214,11 @@ RKR::copy_IO(struct PresetBankStruct _bank[])
     for (int i = 0; i < 62; i++)
     {
         memset(_bank[i].cInput_Gain, 0, sizeof (_bank[i].cInput_Gain));
-        sprintf(_bank[i].cInput_Gain, "%f", _bank[i].Input_Gain);
+        snprintf(_bank[i].cInput_Gain, sizeof(_bank[i].cInput_Gain), "%f", _bank[i].Input_Gain);
         memset(_bank[i].cMaster_Volume, 0, sizeof (_bank[i].cMaster_Volume));
-        sprintf(_bank[i].cMaster_Volume, "%f", _bank[i].Master_Volume);
+        snprintf(_bank[i].cMaster_Volume, sizeof(_bank[i].cMaster_Volume), "%f", _bank[i].Master_Volume);
         memset(_bank[i].cBalance, 0, sizeof (_bank[i].cBalance));
-        sprintf(_bank[i].cBalance, "%f", _bank[i].Fraction_Bypass);
+        snprintf(_bank[i].cBalance, sizeof(_bank[i].cBalance), "%f", _bank[i].Fraction_Bypass);
     }
 }
 
@@ -1628,24 +2297,24 @@ RKR::save_skin(const std::string &filename)
     }
 
     memset(buf, 0, sizeof (buf));
-    sprintf(buf, "%d,%d\n", swidth, sheight);
+    snprintf(buf, sizeof(buf), "%d,%d\n", swidth, sheight);
     fputs(buf, fn);
 
     memset(buf, 0, sizeof (buf));
-    sprintf(buf, "%d,%d,%d,%d\n", sback_color, sfore_color, slabel_color, sleds_color);
+    snprintf(buf, sizeof(buf), "%d,%d,%d,%d\n", sback_color, sfore_color, slabel_color, sleds_color);
     fputs(buf, fn);
 
     memset(buf, 0, sizeof (buf));
-    sprintf(buf, "%s", Config.BackgroundImage);
+    snprintf(buf, sizeof(buf), "%s", Config.BackgroundImage);
     fputs(buf, fn);
     fputs("\n", fn);
 
     memset(buf, 0, sizeof (buf));
-    sprintf(buf, "%d,%d\n", global_font_size, global_font_type);
+    snprintf(buf, sizeof(buf), "%d,%d\n", global_font_size, global_font_type);
     fputs(buf, fn);
 
     memset(buf, 0, sizeof (buf));
-    sprintf(buf, "%d\n", sschema);
+    snprintf(buf, sizeof(buf), "%d\n", sschema);
     fputs(buf, fn);
 
     fclose(fn);
@@ -1768,7 +2437,7 @@ RKR::ConvertOldFile(const std::string &filename)
 {
     char buff[255];
     memset(buff, 0, sizeof (buff));
-    sprintf(buff, "rakconvert -c '%s'", filename.c_str());
+    snprintf(buff, sizeof(buff), "rakconvert -c '%s'", filename.c_str());
     
     if (system(buff) == -1)
     {
@@ -1781,7 +2450,7 @@ RKR::convert_reverb_file(const std::string &filename)
 {
     char buff[255];
     memset(buff, 0, sizeof (buff));
-    sprintf(buff, "rakverb -i '%s'", filename.c_str());
+    snprintf(buff, sizeof(buff), "rakverb -i '%s'", filename.c_str());
     printf("%s\n", buff);
     
     if (system(buff) == -1)
@@ -1803,7 +2472,7 @@ RKR::save_insert_preset(int num, const std::string &name)
         if(insert_preset_location[insert_preset_location.size() - 1] != '/')
             insert_preset_location += "/";
         
-        insert_preset_location += "InsertPresets.rkis";
+        insert_preset_location += C_INSERT_PRESET_FILE;
     }
     else
     {
@@ -1840,7 +2509,10 @@ RKR::delete_insert_preset(int num, const std::string &name)
     if( (strcmp(global_user_directory.c_str(), DATADIR) != 0) && (strcmp(global_user_directory.c_str(), UD_NOT_SET) != 0) )
     {
         insert_preset_location = global_user_directory;
-        insert_preset_location += "InsertPresets.rkis";
+        if(insert_preset_location[insert_preset_location.size() - 1] != '/')
+            insert_preset_location += "/";
+
+        insert_preset_location += C_INSERT_PRESET_FILE;
     }
     else
     {
@@ -1863,11 +2535,11 @@ RKR::delete_insert_preset(int num, const std::string &name)
     memset(tempfile2, 0, sizeof (tempfile2));
     memset(orden, 0, sizeof (orden));
 
-    sprintf(tempfile, "%s", insert_preset_location.c_str());
+    snprintf(tempfile, sizeof(tempfile), "%s", insert_preset_location.c_str());
 
     if ((fs = fopen(tempfile, "r")) == NULL) return;
 
-    sprintf(tempfile2, "%s%s", getenv("HOME"), "/.rkrtemp");
+    snprintf(tempfile2, sizeof(tempfile2), "%s%s", getenv("HOME"), "/.rkrtemp");
 
     if ((fn = fopen(tempfile2, "w")) != NULL)
     {
@@ -1877,7 +2549,7 @@ RKR::delete_insert_preset(int num, const std::string &name)
             char rbuf[256];
             sbuf = buf;
             memset(rbuf, 0, sizeof (rbuf));
-            sprintf(rbuf, "%s", buf);
+            snprintf(rbuf, sizeof(rbuf), "%s", buf);
             sscanf(buf, "%d", &eff);
             char *rname = strsep(&sbuf, ","); // return not used, next delimiter
             rname = strsep(&sbuf, ",");
@@ -1894,7 +2566,7 @@ RKR::delete_insert_preset(int num, const std::string &name)
 
     fclose(fs);
 
-    sprintf(orden, "mv %s %s\n", tempfile2, tempfile);
+    snprintf(orden, sizeof(orden), "mv %s %s\n", tempfile2, tempfile);
 
     if (system(orden) == -1)
     {
@@ -1919,7 +2591,7 @@ RKR::save_MIDI_table(const std::string &filename)
     for (int i = 0; i < 128; i++)
     {
         memset(buf, 0, sizeof (buf));
-        sprintf(buf, "%d,%d\n", MIDI_Table[i].bank, MIDI_Table[i].preset);
+        snprintf(buf, sizeof(buf), "%d,%d\n", MIDI_Table[i].bank, MIDI_Table[i].preset);
         fputs(buf, fn);
     }
 

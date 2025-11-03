@@ -61,8 +61,8 @@ Shuffle::Shuffle(double sample_rate, uint32_t intermediate_bufsize) :
 {
     initialize();
 
-    setpreset(Ppreset);
-    cleanup();
+    Shuffle::setpreset(Ppreset);
+    Shuffle::cleanup();
 }
 
 Shuffle::~Shuffle()
@@ -82,29 +82,22 @@ Shuffle::cleanup()
     mhr->cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Shuffle::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        setCross1(Cross1);
-        setCross2(Cross2);
-        setCross3(Cross3);
-        setCross4(Cross4);
-        setGainL(getpar(Shuffle_Gain_L));
-        setGainML(getpar(Shuffle_Gain_ML));
-        setGainMH(getpar(Shuffle_Gain_MH));
-        setGainH(getpar(Shuffle_Gain_H));
-        set_q(PQ);
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    setCross1(Cross1);
+    setCross2(Cross2);
+    setCross3(Cross3);
+    setCross4(Cross4);
+    setGainL(getpar(Shuffle_Gain_L));
+    setGainML(getpar(Shuffle_Gain_ML));
+    setGainMH(getpar(Shuffle_Gain_MH));
+    setGainH(getpar(Shuffle_Gain_H));
+    set_q(PQ);
 }
 #endif // LV2
 

@@ -91,8 +91,8 @@ DistBand::DistBand(int wave_res, int wave_upq, int wave_dnq,
 {
     initialize();
 
-    setpreset(Ppreset);
-    cleanup();
+    DistBand::setpreset(Ppreset);
+    DistBand::cleanup();
 }
 
 DistBand::~DistBand()
@@ -141,22 +141,15 @@ DistBand::reset_parameters(std::vector<int> parameters)
     cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 DistBand::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        setCross1(Cross1);
-        setCross2(Cross2);
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    setCross1(Cross1);
+    setCross2(Cross2);
 }
 #endif // LV2
 

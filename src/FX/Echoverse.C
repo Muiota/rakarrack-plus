@@ -74,8 +74,8 @@ Echoverse::Echoverse(double sample_rate, uint32_t intermediate_bufsize) :
     ldelay = new delayline(2.0f, 3, sample_rate);
     rdelay = new delayline(2.0f, 3, sample_rate);
 
-    setpreset(Ppreset);
-    cleanup();
+    Echoverse::setpreset(Ppreset);
+    Echoverse::cleanup();
 }
 
 Echoverse::~Echoverse()
@@ -98,11 +98,11 @@ Echoverse::cleanup()
     oldr = 0.0;
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Echoverse::lv2_update_params(uint32_t period)
 {
-    PERIOD = period;
+    PERIOD = period_master = period;
 }
 #endif // LV2
 

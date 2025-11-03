@@ -71,8 +71,8 @@ Distorsion::Distorsion(int wave_res, int wave_upq,
 {
     initialize();
 
-    setpreset(Ppreset);
-    cleanup();
+    Distorsion::setpreset(Ppreset);
+    Distorsion::cleanup();
 }
 
 Distorsion::~Distorsion()
@@ -119,20 +119,13 @@ Distorsion::reset_parameters(std::vector<int> parameters)
     cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Distorsion::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
 }
 #endif // LV2
 

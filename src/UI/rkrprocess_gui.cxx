@@ -27,6 +27,8 @@
  */
 
 #include "rakarrack.h"
+#include <FL/Fl_Shared_Image.H>
+#include "../strlcpy.h"
 #include "../icono_rakarrack_128x128.xpm"
 #include <algorithm>    // std::sort
 static Fl_Widget *previous_widget = NULL;
@@ -57,7 +59,11 @@ RKRGUI::RKRGUI(int argc, char**argv, RKR *rkr_) :
 
     Fl::visual(FL_DOUBLE | FL_RGB);
     fl_register_images();
+
+// NTK_EXTENDED is ntk-unofficial which supports this
+#if defined NTK_EXTENDED || !defined NTK_SUPPORT
     Fl::set_fonts(0);
+#endif
 
     m_process = process_rkr = rkr_;
 
@@ -76,36 +82,45 @@ RKRGUI::RKRGUI(int argc, char**argv, RKR *rkr_) :
     Trigger->icon((char *) p);
     DelayFile->icon((char *) p);
 
+    Analy->set_analyzer_ON(m_process->Config.Analyzer_On_Off);
+    Sco->set_scope_ON(m_process->Config.Scope_On_Off);
+
+    Sco->init(m_process->efxoutl, m_process->efxoutr, m_process->period_master, this);
+    Analy->init(m_process->efxoutl, m_process->efxoutr, m_process->period_master, m_process->sample_rate, this);
+
+    if(Analy->get_analyzer_ON())
+    {
+        Etit->do_callback();
+    }
+    if(Sco->get_scope_ON())
+    {
+        TITTLE_L->do_callback();
+    }
+
     char tmp[256];
-    Analy->set_analyzer_ON(false);
-    Sco->set_scope_ON(false);
-
-    Sco->init(m_process->anall, m_process->analr, m_process->period_master, this);
-    Analy->init(m_process->anall, m_process->analr, m_process->period_master, m_process->sample_rate, this);
-
     memset(tmp, 0, sizeof (tmp));
     if (!m_process->File_To_Load.empty())
     {
-        sprintf(tmp, "Session: %s", m_process->File_To_Load.c_str ());
+        snprintf(tmp, sizeof(tmp), "Session: %s", m_process->File_To_Load.c_str ());
     }
     else
     {
-        sprintf(tmp, "%s   v%s", m_process->jackcliname, VERSION);
+        snprintf(tmp, sizeof(tmp), "%s   v%s", m_process->jackcliname, VERSION);
     }
 
     Principal->copy_label(tmp);
     BankWin_Label(m_process->Config.BankFilename);
     memset(tmp, 0, sizeof (tmp));
-    sprintf(tmp, "%s   v%s - Effects Order", m_process->jackcliname, VERSION);
+    snprintf(tmp, sizeof(tmp), "%s   v%s - Effects Order", m_process->jackcliname, VERSION);
     Order->copy_label(tmp);
     memset(tmp, 0, sizeof (tmp));
-    sprintf(tmp, "%s   v%s - Settings", m_process->jackcliname, VERSION);
+    snprintf(tmp, sizeof(tmp), "%s   v%s - Settings", m_process->jackcliname, VERSION);
     Settings->copy_label(tmp);
-    sprintf(tmp, "%s   v%s - MIDI Learn", m_process->jackcliname, VERSION);
+    snprintf(tmp, sizeof(tmp), "%s   v%s - MIDI Learn", m_process->jackcliname, VERSION);
     MIDILearn->copy_label(tmp);
-    sprintf(tmp, "%s   v%s - ACI", m_process->jackcliname, VERSION);
+    snprintf(tmp, sizeof(tmp), "%s   v%s - ACI", m_process->jackcliname, VERSION);
     Trigger->copy_label(tmp);
-    sprintf(tmp, "%s   v%s - Random", m_process->jackcliname, VERSION);
+    snprintf(tmp, sizeof(tmp), "%s   v%s - Random", m_process->jackcliname, VERSION);
     RandomEdit->copy_label(tmp);
     
     load_previous_state();
@@ -128,8 +143,23 @@ RKRGUI::RKRGUI(int argc, char**argv, RKR *rkr_) :
     
     HideUE->redraw();
 
-    Fl::add_timeout(.04, this->TimeoutStatic, this);
+// NTK does not show well with FL_BACKGROUND2_COLOR of FLTK default
+#ifdef NTK_SUPPORT
+    AboutWin->AB_Title->labelcolor(FL_WHITE);
+    AboutWin->AB_SubTitle->labelcolor(FL_WHITE);
+    AboutWin->About_Version->labelcolor(FL_WHITE);
+    AboutWin->AB_Authors->labelcolor(FL_WHITE);
+    AboutWin->AB_A1->labelcolor(FL_WHITE);
+    AboutWin->AB_A2->labelcolor(FL_WHITE);
+    AboutWin->AB_A3->labelcolor(FL_WHITE);
+    AboutWin->AB_A4->labelcolor(FL_WHITE);
+    AboutWin->AB_A5->labelcolor(FL_WHITE);
+    AboutWin->AB_A6->labelcolor(FL_WHITE);
+#endif
+
     Fl::add_handler(global_shortcuts);
+
+    Fl::add_timeout(.04, this->TimeoutStatic, this);
 }
 
 /**
@@ -170,7 +200,7 @@ void RKRGUI::GuiTimeout(void)
         if (m_process->efx_Tuner->note_actual != m_process->note_old)
         {
             char notas[3];
-            sprintf(notas, "%-2s", m_process->efx_Tuner->notes[m_process->efx_Tuner->note_actual]);
+            snprintf(notas, sizeof(notas), "%-2s", m_process->efx_Tuner->notes[m_process->efx_Tuner->note_actual]);
             WNote->copy_label(notas);
             m_process->note_old = m_process->efx_Tuner->note_actual;
         }
@@ -178,7 +208,7 @@ void RKRGUI::GuiTimeout(void)
         if (m_process->efx_Tuner->nfreq != m_process->nfreq_old)
         {
             char refreq[60];
-            sprintf(refreq, "%8.3f", m_process->efx_Tuner->nfreq);
+            snprintf(refreq, sizeof(refreq), "%8.3f", m_process->efx_Tuner->nfreq);
             WRfreq->copy_label(refreq);
             m_process->nfreq_old = m_process->efx_Tuner->nfreq;
         }
@@ -187,7 +217,7 @@ void RKRGUI::GuiTimeout(void)
         if (fabsf(m_process->efx_Tuner->afreq - m_process->afreq_old) > .2f)
         {
             char nofreq[60];
-            sprintf(nofreq, "%8.3f", m_process->efx_Tuner->afreq);
+            snprintf(nofreq, sizeof(nofreq), "%8.3f", m_process->efx_Tuner->afreq);
             if (abs(m_process->efx_Tuner->cents) > 5)
                 WNfreq->labelcolor(FL_RED);
             else
@@ -199,7 +229,7 @@ void RKRGUI::GuiTimeout(void)
         if (m_process->efx_Tuner->afreq == 0.0f)
         {
             char notas[3];
-            sprintf(notas, "  ");
+            snprintf(notas, sizeof(notas), "  ");
             WNote->copy_label(notas);
         }
 
@@ -320,16 +350,16 @@ void RKRGUI::GuiTimeout(void)
     if (m_process->ACI_Active)
         ActACI();
 
+#ifndef RKR_PLUS_LV2
     m_process->cpufp++;
     if (m_process->cpufp == 40)
     {
         char tmp[8];
         memset(tmp, 0, sizeof (tmp));
-        sprintf(tmp, "%5.2f%%", m_process->cpuload);
+        snprintf(tmp, sizeof (tmp), "%5.2f%%", m_process->cpuload);
         CPULOAD->copy_label(tmp);
         m_process->cpufp = 0;
     }
-
 
     // Jack Port connections
     if (m_process->Jack_Port_Connnection_Changed)
@@ -356,7 +386,7 @@ void RKRGUI::GuiTimeout(void)
             PORT_MIDI_OUT_STATE->hide();
         m_process->Jack_Port_Connnection_Changed = 0;
     }
-
+#endif
     if (global_error_number > 0)
         m_process->Handle_Message(global_error_number);
 
@@ -430,7 +460,21 @@ void RKRGUI::GuiTimeout(void)
         m_process->efx_FLimiter->clipping = 0;
         m_process->efx_FLimiter->limit = 0;
 
+        if(m_process->sco_anal_need_init)
+        {
+            m_process->sco_anal_need_init = false;
+            Sco->init(m_process->efxoutl, m_process->efxoutr, m_process->period_master, this);
+            Analy->init(m_process->efxoutl, m_process->efxoutr, m_process->period_master, m_process->sample_rate, this);
+        }
 
+        if(m_process->handle_bogomips_message)
+        {
+            m_process->handle_bogomips_message = false;
+            m_process->need_bogomips_message = false;   // from lv2 init possibly
+            m_process->Handle_Message(32);
+        }
+
+#ifndef RKR_PLUS_LV2
         if (m_process->checkforaux())
         {
             Vocoder *Efx_Vocoder = static_cast <Vocoder*>(m_process->Rack_Effects[EFX_VOCODER]);
@@ -440,7 +484,7 @@ void RKRGUI::GuiTimeout(void)
                 VOCODER->vu_vu->value(Efx_Vocoder->vulevel);
             }
         }
-
+#endif
         if (Sco->get_scope_ON())
         {
             Sco->redraw();
@@ -470,7 +514,7 @@ void RKRGUI::GuiTimeout(void)
                     m_process->looper_lqua = Efx_Looper->looper_qua;
                     char tmp[16];
                     memset(tmp, 0, sizeof (tmp));
-                    sprintf(tmp, "%d/%d", Efx_Looper->looper_bar, Efx_Looper->looper_qua);
+                    snprintf(tmp, sizeof(tmp), "%d/%d", Efx_Looper->looper_bar, Efx_Looper->looper_qua);
                     LOOPER->L_TimePos->copy_label(tmp);
                 }
             }
@@ -726,9 +770,12 @@ void RKRGUI::put_icon(Fl_Window* window)
  */
 void RKRGUI::load_previous_state()
 {
+#ifdef RKR_PLUS_LV2
+    Principal->size(m_process->Config.Principal_W, m_process->Config.Principal_H);
+#else
     Principal->resize(m_process->Config.Principal_X, m_process->Config.Principal_Y,
                       m_process->Config.Principal_W, m_process->Config.Principal_H);
-
+#endif
     BankWindow->resize(m_process->Config.BankWindow_X, m_process->Config.BankWindow_Y,
                        m_process->Config.BankWindow_W, m_process->Config.BankWindow_H);
 
@@ -785,13 +832,32 @@ void RKRGUI::load_previous_state()
     {
         BankWin_Label(m_process->Command_Line_Bank);
     }
+    
 
+#ifdef RKR_PLUS_LV2
+    // Don't load the default preset if LV2
+    // For LV2 we set the GUI counter for display but don't call do_callback()
+    // since we don't want to load anything and overwrite state restore.
+    m_process->Selected_Preset = m_process->Config.Preset_Number;
+    Preset_Counter->value(m_process->Config.Preset_Number);
+    // For LV2 the FFT multiple occurrences bug will crash things,,,
+    MIDI->Use_FFT->deactivate();
+#else
     if (!m_process->Command_Line_File)
     {
         m_process->Selected_Preset = m_process->Config.Preset_Number;
         Preset_Counter->value(m_process->Config.Preset_Number);
         Preset_Counter->do_callback();
     }
+#endif  //  RKR_PLUS_LV2
+
+#ifdef NTK_SUPPORT
+#ifndef NTK_EXTENDED    // ntk-unofficial which supports this
+    Settings->Font_Bro->deactivate();   // NTK original does not support
+#endif
+    Settings->scheme_ch->deactivate();  // NTK does not support
+    FullScreen_Menu->deactivate();      // NTK does not work correctly
+#endif
 
     // MIDI Learn
     if (!m_process->Config.MIDIway)
@@ -819,9 +885,18 @@ void RKRGUI::load_previous_state()
 
     if (m_process->Config.init_state)
     {
+#ifdef RKR_PLUS_LV2
+        m_process->Active_Preset.FX_Master_Active = m_process->FX_Master_Active_Reset;
+        if(m_process->FX_Master_Active_Reset)
+        {
+            m_process->calculavol(1);
+            m_process->calculavol(2);
+        }
+#else
         m_process->Active_Preset.FX_Master_Active = 1;
         m_process->calculavol(1);
         m_process->calculavol(2);
+#endif
     }
 
     Settings->RC_Harm_Opti->value(m_process->Config.RCOpti_Harm);
@@ -849,6 +924,9 @@ void RKRGUI::load_previous_state()
 
     MIDI->midi_activar->value(m_process->Config.MIDI_Converter_On_Off);
     MIDI->midi_activar->do_callback();
+
+    MIDI->Use_FFT->value(m_process->Config.Use_FFT);
+    MIDI->Use_FFT->do_callback();
 
     //Metronome
     MetroBar->value(m_process->Config.Metronome_Time);
@@ -884,6 +962,7 @@ void RKRGUI::load_previous_state()
     // Tap Tempo
     m_process->Tap_Selection = m_process->Config.Tap_Selection;
     T_SEL->value(m_process->Tap_Selection);
+    T_DIS->value((double) m_process->Tap_TempoSet);
 
     m_process->t_timeout = m_process->Config.t_timeout;
     Settings->T_TIMEOUT->value(m_process->t_timeout);
@@ -933,7 +1012,7 @@ void RKRGUI::load_previous_state()
     RandomEdit->random_max->value(max_random_active);
 
     // Set any excluded effects
-    for(int i = 0; i < C_NUMBER_EFFECTS; ++i)
+    for(int i = 0; i < EFX_NUMBER_EFFECTS; ++i)
     {
         if( m_process->Config.Rand_Exclude[i] == ASCII_One)
             FX_Excluded[i] = (char) 1;
@@ -947,7 +1026,7 @@ void RKRGUI::load_previous_state()
         long long ud = (long long) w->user_data();
         ud -= UD_random_edit;
 
-        if(ud >= 0 && ud <= 46)
+        if(ud >= 0 && ud < EFX_NUMBER_EFFECTS)
         {
             RKR_Check_Button *b = static_cast<RKR_Check_Button *>(w);
 
@@ -959,6 +1038,18 @@ void RKRGUI::load_previous_state()
     }
 }
 
+/**
+ * Save the user preferences to the ~/.fltk/github.com.Stazed.rakarrack.plus folder (or NSM config).
+ * For RKR_PLUS_LV2, when the UI is shown, it loads from the saved values in m_process. Since
+ * the UI does not get deleted on standalone until the program quits, it does not matter if
+ * the m_process values are updated. But for the LV2, the UI is deleted on hide and when re-shown,
+ * the UI state is loaded from existing m_process values. So, the #ifdef RKR_PLUS_LV2 items are to
+ * update the m_process values on hide/show.
+ * @param rakarrack
+ *      The Fl_Preferences - the location of the preferences file.
+ * @param whati
+ *      The specific items to save. (See save_current_state() function comments for whati types).
+ */
 void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
 {
     char temp1[128];
@@ -971,7 +1062,14 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("Principal H"), Principal->h());
         rakarrack.set(m_process->Config.PrefNom("FontSize"), global_font_size);
         rakarrack.set(m_process->Config.PrefNom("Font"), global_font_type);
-
+#ifdef RKR_PLUS_LV2
+        m_process->Config.Principal_X = Principal->x();
+        m_process->Config.Principal_Y = Principal->y();
+        m_process->Config.Principal_W = Principal->w();
+        m_process->Config.Principal_H = Principal->h();
+        m_process->Config.font_size = global_font_size;
+        m_process->Config.font_type = global_font_type;
+#endif
         rakarrack.set(m_process->Config.PrefNom("Background Color"), (int) global_back_color);
         rakarrack.set(m_process->Config.PrefNom("Foreground Color"), (int) global_fore_color);
         rakarrack.set(m_process->Config.PrefNom("Leds Color"), (int) global_leds_color);
@@ -980,10 +1078,23 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("Hide Effects"), (int) m_process->Config.deachide);
         rakarrack.set(m_process->Config.PrefNom("Scale Window"), (int) m_process->Config.scalable);
 
+#ifdef RKR_PLUS_LV2
+        m_process->Config.back_color = (int) global_back_color;
+        m_process->Config.fore_color = (int) global_fore_color;
+        m_process->Config.leds_color = (int) global_leds_color;
+        m_process->Config.label_color = (int) global_label_color;
+        m_process->Config.Schema = (int) Settings->scheme_ch->value();
+#endif
+
         rakarrack.set(m_process->Config.PrefNom("Bank Selected"), m_process->active_bank);
 
         if ((Preset_Counter->value() > 0) && (Preset_Counter->value() < 61))
+        {
             rakarrack.set(m_process->Config.PrefNom("Preset Num"), (int) Preset_Counter->value());
+#ifdef RKR_PLUS_LV2
+            m_process->Config.Preset_Number = (int) Preset_Counter->value();
+#endif
+        }
 
         if (m_process->help_displayed)
         {
@@ -992,10 +1103,21 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
             rakarrack.set(m_process->Config.PrefNom("Help W"), visor->w());
             rakarrack.set(m_process->Config.PrefNom("Help H"), visor->h());
             rakarrack.set(m_process->Config.PrefNom("Help TextSize"), visor->textsize());
+#ifdef RKR_PLUS_LV2
+            m_process->Config.Help_X = visor->x();
+            m_process->Config.Help_Y = visor->y();
+            m_process->Config.Help_W = visor->w();
+            m_process->Config.Help_H = visor->h();
+            m_process->Config.Help_TextSize = visor->textsize();
+            m_process->help_displayed = 0;  // For LV2 the UI is deleted so reset as not displayed
+#endif
         }
 
         //Tuner
         rakarrack.set(m_process->Config.PrefNom("Tuner On/Off"), (int) m_process->Tuner_Active);
+#ifdef RKR_PLUS_LV2
+        m_process->Config.Tuner_On_Off = (int) m_process->Tuner_Active;
+#endif
 
         //MIDIConverter
         rakarrack.set(m_process->Config.PrefNom("MIDI Converter On/Off"), (int) m_process->MIDIConverter_Active);
@@ -1003,7 +1125,15 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("Trigger Adjust"), (int) MIDI->Trig_Adj->value());
         rakarrack.set(m_process->Config.PrefNom("Velocity Adjust"), (int) MIDI->Vel_Adj->value());
         rakarrack.set(m_process->Config.PrefNom("Converter Octave"), (int) MIDI->MIDIOctave->value());
-
+        rakarrack.set(m_process->Config.PrefNom("Use FFT"), (int) MIDI->Use_FFT->value());
+#ifdef RKR_PLUS_LV2
+        m_process->Config.Midi_Out_Channel = (int) MIDI->Midi_out_Counter->value();
+        m_process->Config.Trigger_Adjust = (int) MIDI->Trig_Adj->value();
+        m_process->Config.Velocity_Adjust = (int) MIDI->Vel_Adj->value();
+        m_process->Config.Converter_Octave = (int) MIDI->MIDIOctave->value();
+        m_process->Config.MIDI_Converter_On_Off = (int) m_process->MIDIConverter_Active;
+        m_process->Config.Use_FFT = (int) MIDI->Use_FFT->value();
+#endif
         //Metronome
         rakarrack.set(m_process->Config.PrefNom("Internal Metronome On/Off"), (int) m_process->Metro_Active);
         rakarrack.set(m_process->Config.PrefNom("Internal Metronome Time"), (int) MetroBar->value());
@@ -1011,14 +1141,33 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("Internal Metronome Tempo"), (int) Metro_Tempo->value());
         rakarrack.set(m_process->Config.PrefNom("Internal Metronome Show"), (int) m_process->Config.sw_stat);
         rakarrack.set(m_process->Config.PrefNom("Internal Metronome Sound"), (int) MetroSound->value());
-
+#ifdef RKR_PLUS_LV2
+        m_process->Config.Metronome_On_Off = (int) m_process->Metro_Active;
+        m_process->Config.Metronome_Time = (int) MetroBar->value();
+        m_process->Config.Metro_Vol = (int) Metro_Volume->value();
+        m_process->Config.Metronome_Tempo = (int) Metro_Tempo->value();
+        m_process->Config.Metronome_Sound = (int) MetroSound->value();
+#endif
         //Booster
         rakarrack.set(m_process->Config.PrefNom("Booster"), m_process->booster);
+#ifdef RKR_PLUS_LV2
+        m_process->Config.booster = m_process->booster;
+#endif
 
         //Tap Tempo
         rakarrack.set(m_process->Config.PrefNom("TapTempo On/Off"), (int) m_process->Tap_Active);
         rakarrack.set(m_process->Config.PrefNom("TapTempo Input"), (int) m_process->Tap_Selection);
         rakarrack.set(m_process->Config.PrefNom("TapTempo Set"), (int) m_process->Tap_SetValue);
+#ifdef RKR_PLUS_LV2
+        m_process->Config.TapTempo_On_Off = (int) m_process->Tap_Active;
+        m_process->Config.Tap_Selection = (int) m_process->Tap_Selection;
+        m_process->Config.Tap_SetValue = (int) m_process->Tap_SetValue;
+        m_process->Tap_TempoSet = (int) T_DIS->value();
+
+        // We don't save this to preferences, this is just for LV2 hide/show gui consistency
+        m_process->Config.Analyzer_On_Off = Analy->get_analyzer_ON();
+        m_process->Config.Scope_On_Off = Sco->get_scope_ON();
+#endif
     }
 
     if (whati == 1)
@@ -1027,6 +1176,12 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("BankWindow Y"), BankWindow->y());
         rakarrack.set(m_process->Config.PrefNom("BankWindow W"), BankWindow->w());
         rakarrack.set(m_process->Config.PrefNom("BankWindow H"), BankWindow->h());
+#ifdef RKR_PLUS_LV2
+        m_process->Config.BankWindow_X = BankWindow->x();
+        m_process->Config.BankWindow_Y = BankWindow->y();
+        m_process->Config.BankWindow_W = BankWindow->w();
+        m_process->Config.BankWindow_H = BankWindow->h();
+#endif
     }
 
     if (whati == 2)
@@ -1035,6 +1190,12 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("Order Y"), Order->y());
         rakarrack.set(m_process->Config.PrefNom("Order W"), Order->w());
         rakarrack.set(m_process->Config.PrefNom("Order H"), Order->h());
+#ifdef RKR_PLUS_LV2
+        m_process->Config.Order_X = Order->x();
+        m_process->Config.Order_Y = Order->y();
+        m_process->Config.Order_W = Order->w();
+        m_process->Config.Order_H = Order->h();
+#endif
     }
 
     if (whati == 3)
@@ -1043,6 +1204,12 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("Settings Y"), Settings->y());
         rakarrack.set(m_process->Config.PrefNom("Settings W"), Settings->w());
         rakarrack.set(m_process->Config.PrefNom("Settings H"), Settings->h());
+#ifdef RKR_PLUS_LV2
+        m_process->Config.Settings_X = Settings->x();
+        m_process->Config.Settings_Y = Settings->y();
+        m_process->Config.Settings_W = Settings->w();
+        m_process->Config.Settings_H = Settings->h();
+#endif
     }
 
     if (whati == 4)
@@ -1056,12 +1223,28 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("Rand Active"), efx_always_active);
         rakarrack.set(m_process->Config.PrefNom("Rand Current"), use_current_active_efx);
         rakarrack.set(m_process->Config.PrefNom("Rand Max"), max_random_active);
+#ifdef RKR_PLUS_LV2
+        m_process->Config.Random_X = RandomEdit->x();
+        m_process->Config.Random_Y = RandomEdit->y();
+        m_process->Config.Random_W = RandomEdit->w();
+        m_process->Config.Random_H = RandomEdit->h();
 
+        m_process->Config.Rand_Parameters = random_parameters;
+        m_process->Config.Rand_Active = efx_always_active;
+        m_process->Config.Rand_Current = use_current_active_efx;
+        m_process->Config.Rand_Max = max_random_active;
+#endif
         // convert the asci char to string for the set 
         std::string s;
-        for(int i = 0; i < C_NUMBER_EFFECTS; ++i)
+        for(int i = 0; i < EFX_NUMBER_EFFECTS; ++i)
         {
             s +=  NTS((int) FX_Excluded[i]);
+#ifdef RKR_PLUS_LV2
+            if(FX_Excluded[i] == (char) 1)
+                m_process->Config.Rand_Exclude[i] = ASCII_One;
+            else
+                m_process->Config.Rand_Exclude[i] = ASCII_Space;
+#endif
         }
 
         rakarrack.set(m_process->Config.PrefNom("Rand Exclude"), s.c_str());
@@ -1073,6 +1256,12 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("MIDI Learn Y"), MIDILearn->y());
         rakarrack.set(m_process->Config.PrefNom("MIDI Learn W"), MIDILearn->w());
         rakarrack.set(m_process->Config.PrefNom("MIDI Learn H"), MIDILearn->h());
+#ifdef RKR_PLUS_LV2
+        m_process->Config.MIDI_Learn_X = MIDILearn->x();
+        m_process->Config.MIDI_Learn_Y = MIDILearn->y();
+        m_process->Config.MIDI_Learn_W = MIDILearn->w();
+        m_process->Config.MIDI_Learn_H = MIDILearn->h();
+#endif
     }
 
     if (whati == 6)
@@ -1081,7 +1270,19 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("Trigger Y"), Trigger->y());
         rakarrack.set(m_process->Config.PrefNom("Trigger W"), Trigger->w());
         rakarrack.set(m_process->Config.PrefNom("Trigger H"), Trigger->h());
+#ifdef RKR_PLUS_LV2
+        m_process->Config.Trigger_X = Trigger->x();
+        m_process->Config.Trigger_Y = Trigger->y();
+        m_process->Config.Trigger_W = Trigger->w();
+        m_process->Config.Trigger_H = Trigger->h();
 
+        m_process->Config.Aux_Source = m_process->Aux_Source;
+        m_process->Config.Aux_Gain = m_process->Aux_Gain;
+        m_process->Config.Aux_Threshold = m_process->Aux_Threshold;
+        m_process->Config.Aux_MIDI = m_process->Aux_MIDI;
+        m_process->Config.Aux_Minimum = m_process->Aux_Minimum;
+        m_process->Config.Aux_Maximum = m_process->Aux_Maximum;
+#endif
         rakarrack.set(m_process->Config.PrefNom("Aux Source"), m_process->Aux_Source);
         rakarrack.set(m_process->Config.PrefNom("Aux Gain"), m_process->Aux_Gain);
         rakarrack.set(m_process->Config.PrefNom("Aux Threshold"), m_process->Aux_Threshold);
@@ -1096,6 +1297,13 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
         rakarrack.set(m_process->Config.PrefNom("Delay Y"), DelayFile->y());
         rakarrack.set(m_process->Config.PrefNom("Delay W"), DelayFile->w());
         rakarrack.set(m_process->Config.PrefNom("Delay H"), DelayFile->h());
+#ifdef RKR_PLUS_LV2
+        m_process->Config.Delay_X = DelayFile->x();
+        m_process->Config.Delay_Y = DelayFile->y();
+        m_process->Config.Delay_W = DelayFile->w();
+        m_process->Config.Delay_H = DelayFile->h();
+        // TODO need to save the delay gui table for gui hide and return.
+#endif
     }
 
     if ((whati == 3) || (whati == 0))
@@ -1161,7 +1369,13 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
 
         rakarrack.set(m_process->Config.PrefNom("Vocoder Bands"), m_process->Config.VocBands);
 
+#ifdef RKR_PLUS_LV2
         rakarrack.set(m_process->Config.PrefNom("FX_init_state"), m_process->Config.init_state);
+        // If the user changed the Active button, then we need to reset it on gui show
+        m_process->FX_Master_Active_Reset = m_process->Active_Preset.FX_Master_Active;
+#else
+        rakarrack.set(m_process->Config.PrefNom("FX_init_state"), m_process->Config.init_state);
+#endif
         rakarrack.set(m_process->Config.PrefNom("Auto Assign"), m_process->Config.autoassign);
 
         rakarrack.set(m_process->Config.PrefNom("UpSampling"), m_process->Config.upsample);
@@ -1222,7 +1436,7 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
             if (Settings->JackCo->selected(i))
             {
                 memset(temp1, 0, sizeof (temp1));
-                sprintf(temp1, "Jack Port %d", k);
+                snprintf(temp1, sizeof(temp1), "Jack Port %d", k);
                 rakarrack.set(m_process->Config.PrefNom(temp1), Settings->JackCo->text(i));
                 k++;
             }
@@ -1236,7 +1450,7 @@ void RKRGUI::save_preferences (Fl_Preferences &rakarrack, int whati)
             if (Settings->JackIn->selected(i))
             {
                 memset(temp1, 0, sizeof (temp1));
-                sprintf(temp1, "Jack Port In %d", k);
+                snprintf(temp1, sizeof(temp1), "Jack Port In %d", k);
                 rakarrack.set(m_process->Config.PrefNom(temp1), Settings->JackIn->text(i));
                 k++;
             }
@@ -1270,7 +1484,11 @@ void RKRGUI::save_current_state(int whati)
     }
     else    // Using NSM
     {
+#if defined FLTK_VERSION_1_4 && !defined NTK_SUPPORT
+        Fl_Preferences rakarrack(nsm_preferences_file.c_str(), jack_client_name, NULL, Fl_Preferences::USER_L);
+#else
         Fl_Preferences rakarrack(nsm_preferences_file.c_str(), jack_client_name, NULL);
+#endif
         save_preferences(rakarrack, whati);
     }
 }
@@ -1319,7 +1537,7 @@ void RKRGUI::Put_Loaded()
         switch(m_process->efx_order[i]){
      */
 
-    for (int i = 0; i < C_NUMBER_EFFECTS; i++)
+    for (int i = 0; i < EFX_NUMBER_EFFECTS; i++)
     {
         // Cabinet is special
         if( i == EFX_CABINET)
@@ -1467,7 +1685,7 @@ void RKRGUI::reordena()
     y[9] = E10->y();
 
     // Hide All Effects
-    for (int i = 0; i < C_NUMBER_EFFECTS; i++)
+    for (int i = 0; i < EFX_NUMBER_EFFECTS; i++)
     {
         Efx_Gui_Base[i]->hide ();
     }
@@ -1475,7 +1693,7 @@ void RKRGUI::reordena()
     // Show effects with new order
     for (int i = 0; i < C_NUMBER_ORDERED_EFFECTS; i++)
     {
-        for (int j = 0; j < C_NUMBER_EFFECTS; j++)
+        for (int j = 0; j < EFX_NUMBER_EFFECTS; j++)
         {
             // Search the effects for the requested in main window order 
             if (j == m_process->efx_order[i])
@@ -1609,7 +1827,7 @@ void RKRGUI::show_help()
 
 
     memset(temp, 0, sizeof (temp));
-    sprintf(temp, "%s/html/help.html", HELPDIR);
+    snprintf(temp, sizeof(temp), "%s/html/help.html", HELPDIR);
 
 
     if (FILE * file = fopen(temp, "r"))
@@ -1638,7 +1856,7 @@ void RKRGUI::show_lic()
     }
 
     memset(temp, 0, sizeof (temp));
-    sprintf(temp, "%s/html/license.html", HELPDIR);
+    snprintf(temp, sizeof(temp), "%s/html/license.html", HELPDIR);
     visor->load(temp);
 
     m_process->help_displayed = 1;
@@ -1649,6 +1867,7 @@ void RKRGUI::show_lic()
 void RKRGUI::MiraClientes()
 {
     // Find Audio and midi ports
+#ifndef RKR_PLUS_LV2
     FILE *fp;
 
     Settings->BMidiIn->clear();
@@ -1665,14 +1884,14 @@ void RKRGUI::MiraClientes()
             {
                 char temp1[128];
                 char *masque;
-                strcpy(temp1, temp);
+                RKRP::strlcpy(temp1, temp, sizeof(temp1));
                 strtok(temp1, "\"");
                 char *name = strtok(NULL, "\"");
                 masque = strtok(NULL, ")");
                 
                 std::string s_name = m_process->jackcliname;
-                s_name + " MC OUT";
-
+                s_name += " MC OUT";
+                
                 if ((masque[2] == 'R') && (strstr(name, s_name.c_str()) == 0))
                 {
                     Settings->BMidiIn->add(name);
@@ -1735,11 +1954,17 @@ void RKRGUI::MiraClientes()
     }
 
     free(iports);
+#endif  // #ifndef RKR_PLUS_LV2
 }
 
 void RKRGUI::MiraConfig()
 {
     // Loads the settings into the settings class
+#ifdef RKR_PLUS_LV2
+    Settings->BMidiIn->deactivate();
+    Settings->JackCo->deactivate();
+    Settings->JackIn->deactivate();
+#else
     {
         int i = 1;
         while (Settings->BMidiIn->text(i) != NULL)
@@ -1783,6 +2008,7 @@ void RKRGUI::MiraConfig()
             i++;
         }
     }
+#endif  // #ifdef RKR_PLUS_LV2
 
     if (m_process->Config.MIDIway)
     {
@@ -1895,9 +2121,16 @@ void RKRGUI::MiraConfig()
 #endif
     Settings->Upr_Amo->value(m_process->Config.UpAmo);
     Settings->L_SIZE->value(m_process->Config.looper_size);
+#ifdef RKR_PLUS_LV2
+    Settings->D_A_Connect->deactivate();
+    Settings->D_J_Connect->deactivate();
+    Settings->D_IJ_Connect->deactivate();
+    Settings->INSTATE->deactivate();    // Always ON for LV2
+#else
     Settings->D_A_Connect->value(m_process->Config.aconnect_MI);
     Settings->D_J_Connect->value(m_process->Config.aconnect_JA);
     Settings->D_IJ_Connect->value(m_process->Config.aconnect_JIA);
+#endif
     
     // For NSM the default setting is Off for auto connect audio and we do not let the user change it.
     // All jack connections should be handled by NSM.
@@ -1991,7 +2224,7 @@ void RKRGUI::MiraConfig()
             break;
     }
 
-
+#ifndef RKR_PLUS_LV2
     if (m_process->Config.aconnect_MI)
     {
         Settings->BMidiIn->activate();
@@ -2018,6 +2251,7 @@ void RKRGUI::MiraConfig()
     {
         Settings->JackIn->deactivate();
     }
+#endif  // #ifdef RKR_PLUS_LV2
 
     Fl_Menu_Item *item;
     Fl_Menu_Item *Har = Settings->get_menu_Har_Downsample();
@@ -2075,6 +2309,8 @@ void RKRGUI::MiraConfig()
     Settings->Font_Bro->clear();
     Settings->Font_Bro->textcolor(global_label_color);
 
+// NTK_EXTENDED is ntk-unofficial which supports this
+#if defined NTK_EXTENDED || !defined NTK_SUPPORT
     int k = Fl::set_fonts(0);
     for (int i = 0; i < k; i++)
     {
@@ -2101,12 +2337,12 @@ void RKRGUI::MiraConfig()
             name = buffer;
         }
 #else // this is neat, but really slow on some X servers:
-        sprintf(buffer, "@F%d@.%s", i, name);
+        snprintf(buffer, sizeof(buffer), "@F%d@.%s", i, name);
         name = buffer;
 #endif
         Settings->Font_Bro->add(name);
     }
-
+#endif  // defined NTK_EXTENDED || !defined NTK_SUPPORT
     Settings->Font_Bro->value(global_font_type + 1);
 }
 
@@ -2115,7 +2351,7 @@ void RKRGUI::BankWin_Label(const std::string &filename)
     char tmp[256];
 
     memset(tmp, 0, sizeof (tmp));
-    sprintf(tmp, "%s   v%s - Bank Manager - %s", m_process->jackcliname, VERSION, fl_filename_name(filename.c_str()));
+    snprintf(tmp, sizeof(tmp), "%s   v%s - Bank Manager - %s", m_process->jackcliname, VERSION, fl_filename_name(filename.c_str()));
     BankWindow->copy_label(tmp);
 }
 
@@ -2217,7 +2453,8 @@ void RKRGUI::Chord(int eff)
 
     if (eff == 0)
     {
-        sprintf(m_process->RC_Harm->NombreAcorde, "%s%s", m_process->RC_Harm->NCE[undi].Nom, m_process->RC_Harm->ChN[tipo].Nom);
+        snprintf(m_process->RC_Harm->NombreAcorde, sizeof(m_process->RC_Harm->NombreAcorde),
+                 "%s%s", m_process->RC_Harm->NCE[undi].Nom, m_process->RC_Harm->ChN[tipo].Nom);
 
         m_process->RC_Harm->ctipo = tipo;
         m_process->RC_Harm->fundi = undi;
@@ -2225,7 +2462,8 @@ void RKRGUI::Chord(int eff)
     }
     else
     {
-        sprintf(m_process->RC_Stereo_Harm->NombreAcorde, "%s%s", m_process->RC_Stereo_Harm->NCE[undi].Nom, m_process->RC_Stereo_Harm->ChN[tipo].Nom);
+        snprintf(m_process->RC_Stereo_Harm->NombreAcorde, sizeof(m_process->RC_Stereo_Harm->NombreAcorde),
+                "%s%s", m_process->RC_Stereo_Harm->NCE[undi].Nom, m_process->RC_Stereo_Harm->ChN[tipo].Nom);
 
         m_process->RC_Stereo_Harm->ctipo = tipo;
         m_process->RC_Stereo_Harm->fundi = undi;
@@ -2330,7 +2568,7 @@ void RKRGUI::ActOnOff()
         }
         
         // Check for rack effects
-        if (miralo < C_NUMBER_EFFECTS)
+        if (miralo < EFX_NUMBER_EFFECTS)
         {
             Efx_Gui_Base[miralo]->activate_effect->value (m_process->EFX_Active[miralo]);
             Efx_Gui_Base[miralo]->activate_effect->do_callback ();
@@ -2378,7 +2616,7 @@ void RKRGUI::PutBackground()
     InOut->image(back);
 
     // Rack effects
-    for (int i = 0; i < C_NUMBER_EFFECTS; i++)
+    for (int i = 0; i < EFX_NUMBER_EFFECTS; i++)
     {
         Efx_Gui_Base[i]->image (InOut->image());
     }
@@ -2389,7 +2627,6 @@ void RKRGUI::PutBackground()
     MIDI->image(InOut->image());
     Metro->image(InOut->image());
     fondo->image(InOut->image());
-    TITTLE_L->image(InOut->image());
     Order->Fondo1->image(InOut->image());
     Settings->Fondo2->image(InOut->image());
     BankWindow->Fondo3->image(InOut->image());
@@ -2403,12 +2640,17 @@ void RKRGUI::PutBackground()
     Settings->Fondo11->image(InOut->image());
     Settings->Fondo12->image(InOut->image());
 
-    Etit->image(InOut->image());
+    // Don't know why setting the image for these causes the labels of the 
+    // MenuP (TITTLE_L) and the Etit (Rakarrack +) to be hidden for FLTK 1.4.
+    // But they don't seem necessary for NTK or earlier versions of FLTK.
+//    TITTLE_L->image(InOut->image());
+//    Etit->image(InOut->image());
+
     MIDILearn->Ares->image(InOut->image());
 
     MenuP->image(InOut->image());
     BankWindow->MenuB->image(InOut->image());
-    
+
     DelayFile->Fondo13->image(InOut->image());
     RandomEdit->Fondo14->image(InOut->image());
 
@@ -2629,7 +2871,7 @@ void RKRGUI::FillML(/*int type*/)
     memset(tmp, 0, sizeof (tmp));
 
 
-    sprintf(tmp, "%s   v%s - MIDI Learn - Preset : %s", m_process->jackcliname, VERSION, m_process->Bank[m_process->Selected_Preset].Preset_Name);
+    snprintf(tmp, sizeof(tmp), "%s   v%s - MIDI Learn - Preset : %s", m_process->jackcliname, VERSION, m_process->Bank[m_process->Selected_Preset].Preset_Name);
     MIDILearn->copy_label(tmp);
 
     memset(m_process->ML_clist, 0, sizeof (m_process->ML_clist));
@@ -2716,7 +2958,7 @@ void RKRGUI::DisAssigns()
             {
                 k++;
                 memset(tmp, 0, sizeof (tmp));
-                sprintf(tmp, "%d", i);
+                snprintf(tmp, sizeof(tmp), "%d", i);
 
                 switch (k)
                 {
@@ -2953,6 +3195,16 @@ void RKRGUI::Prepare_Order()
     Order->Order_Bro->select(1);
 }
 
+void RKRGUI::Show_Reset_Window()
+{
+    Reset_Window w_reset( m_process, p);
+    w_reset.show_reset_window();
+
+    // Update these as well
+    Sco->init(m_process->efxoutl, m_process->efxoutr, m_process->period_master, this);
+    Analy->init(m_process->efxoutl, m_process->efxoutr, m_process->period_master, m_process->sample_rate, this);
+}
+
 void RKRGUI::Show_Next_Time()
 {
     // popup for settings changes that will not take effect until restart
@@ -3003,7 +3255,7 @@ void RKRGUI::update_looper()
  */
 void RKRGUI::update_tap_tempo_GUI()
 {
-    for(int efx_index = 0; efx_index < C_NUMBER_EFFECTS; efx_index++)
+    for(int efx_index = 0; efx_index < EFX_NUMBER_EFFECTS; efx_index++)
     {
         if (m_process->EFX_Active[efx_index])
         {
@@ -3023,9 +3275,15 @@ void RKRGUI::ActACI()
     switch (m_process->Aux_Source)
     {
         case 0:
+        {
+#ifdef RKR_PLUS_LV2
+            tmp = 0.0;  // LV2 does not have aux input
+#else
             gain = dB2rap(75.0f * (float) m_process->Aux_Gain / 127.0f);
             tmp = m_process->val_a_sum * gain;
+#endif
             break;
+        }
         case 1:
             gain = (float) m_process->Aux_Gain / 127.0f;
             tmp = dB2rap(m_process->val_il_sum) * 12.0f * gain;
@@ -3088,7 +3346,7 @@ int RKRGUI::Busca_Eff(int num)
 {
     int i = 0;
 
-    for (i = 0; i < C_NUMBER_EFFECTS; i++)
+    for (i = 0; i < EFX_NUMBER_EFFECTS; i++)
     {
         if (m_process->efx_names[i].Pos == num)
         {
@@ -3107,7 +3365,7 @@ void RKRGUI::Fill_Avail(int filter)
 
     int t = 1;
 
-    for (int i = 0; i < C_NUMBER_EFFECTS; i++)
+    for (int i = 0; i < EFX_NUMBER_EFFECTS; i++)
     {
         int k = 0;
         for (int j = 0; j < C_NUMBER_ORDERED_EFFECTS; j++)
@@ -3292,6 +3550,11 @@ void RKRGUI::Scan_Bank_Dir(int reload)
  */
 int RKRGUI::global_shortcuts(int event)
 {
+#if 0
+    /* This is the original method for main window dragging start which uses the event handler.
+       This would not work for embedded NTK window since the event handler seems to not update
+       the below mouse coordinates when the window is moved. So this is replaced by a direct
+       callback from the effect label box instead.*/
     if (event == FL_DRAG)
     {
         Fl_Widget *widget_belowmouse = Fl::belowmouse();
@@ -3301,7 +3564,7 @@ int RKRGUI::global_shortcuts(int event)
         drag = widget_user_data - UD_Label_1;
         return 1;
     }
-
+#endif
     if (event != FL_SHORTCUT)
     {
         return 0;
@@ -3430,8 +3693,7 @@ void RKRGUI::PrepareML()
         put_icon(MIDILearn);
         return;
     }
-
-    if (m_process->comemouse)
+    else
     {
         if (m_process->Config.autoassign == 0)
         {
@@ -3764,6 +4026,16 @@ inline void RKRGUI::cb_Set_effect_i(RKR_Check_Button* o, void* v)
     FX_Excluded[ud] = (char) o->value();
 }
 
+/**
+ * For consistency with the landing position we use the UD lablel from the user data for the
+ * rack_position starting point. Subtract UD_Label_1 to get the actual drag value (0 to 9).
+ * @param rack_position
+ */
+void RKRGUI::set_drag(int rack_position)
+{
+    drag = rack_position - UD_Label_1;
+}
+
 void RKRGUI::RandomPreset()
 {
     if(use_current_active_efx)
@@ -3795,7 +4067,7 @@ void RKRGUI::RandomPreset()
     
     // Check if invalid number of effects are excluded
     int excluded = 0;
-    for(unsigned e = 0; e < C_NUMBER_EFFECTS; ++e)
+    for(unsigned e = 0; e < EFX_NUMBER_EFFECTS; ++e)
     {
         if(FX_Excluded[e])
             excluded++;
@@ -3816,7 +4088,7 @@ void RKRGUI::RandomPreset()
     // Get the first one to compare for duplicates
     while(1)
     {
-        Effect_Index[0] = (int) (RND * C_NUMBER_EFFECTS);
+        Effect_Index[0] = (int) (RND * EFX_NUMBER_EFFECTS);
 
         // Did the user want this to be selected
         if(!FX_Excluded[Effect_Index[0]])
@@ -3831,7 +4103,7 @@ void RKRGUI::RandomPreset()
         int l = 0;
         while (l == 0)
         {
-            Effect_Index[i] = (int) (RND * C_NUMBER_EFFECTS);
+            Effect_Index[i] = (int) (RND * EFX_NUMBER_EFFECTS);
             for (int j = 0; j < i; j++)
             {
                 // Check that there are no duplicate selections
@@ -3845,7 +4117,7 @@ void RKRGUI::RandomPreset()
                     bool dont_use = false;
 
                     // Check if the user wants this effect chosen
-                    for (int k = 0; k < C_NUMBER_EFFECTS; k++)
+                    for (int k = 0; k < EFX_NUMBER_EFFECTS; k++)
                     {
                         if (k == Effect_Index[i])
                         {
@@ -4235,5 +4507,74 @@ void RKRGUI::NSM_gui_hide()
     RandomEdit->hide();
     Fl::flush();
     global_gui_show = CONST_GUI_OFF;
+#endif
+}
+
+void
+RKRGUI::LV2_gui_hide()
+{
+#ifdef RKR_PLUS_LV2
+    is_bank_modified();
+    is_PG_table_modified();
+
+    BankWindow->hide();
+    Order->hide();
+    Settings->hide();
+    AboutWin->hide();
+    MIDILearn->hide();
+    Trigger->hide();
+    DelayFile->hide();
+    RandomEdit->hide();
+
+    /**
+     * Principal->hide();   (embedded)
+     * We don't hide the Principal window here because not all hosts delete the GUI on close.
+     * If not deleted the hide() will detach the Principal from the embedding host X11 parent
+     * window and the subsequent show() will be a detached Principal with a separate host X11 frame.
+     * When the host deletes the GUI on close, cleanup() is called and we hide() the Principal there
+     * before deleting it.
+     */
+
+    for(unsigned i = 0; i < 8; ++i)
+        save_current_state(i);
+
+    m_process->Gui_Shown = 0;
+    Fl::remove_timeout(this->TimeoutStatic, this);
+    m_process->lv2_process_midi_program_changes();  // this sets m_process->Exit_Program = 1;
+#endif
+}
+
+void RKRGUI::LV2_gui_show()
+{
+#ifdef RKR_PLUS_LV2
+    // To update the Gui for any MIDI changes
+
+    /* For cabinet we need to update active preset on return from hide to refresh the gui */
+    m_process->Active_Preset.Effect_Params[EFX_CABINET][0] = m_process->Rack_Effects[EFX_CABINET]->getpar(0);
+    m_process->Active_Preset.Effect_Params[EFX_CABINET][1] = m_process->Rack_Effects[EFX_CABINET]->getpar(1);
+
+    Put_Loaded();
+    Put_Loaded_Bank();
+
+    if(m_process->hold_preset != C_CHANGE_PRESET_OFF)
+    {
+        BankWindow->unlight_preset(m_process->Selected_Preset);
+        BankWindow->light_preset(m_process->hold_preset);
+        Preset_Counter->value(m_process->hold_preset);
+        m_process->Selected_Preset = m_process->hold_preset;
+        m_process->hold_preset = C_CHANGE_PRESET_OFF;
+    }
+
+    // Need to reset OnOffC because the value is not adjusted or
+    // reset when the gui is hidden. If not reset, then it can
+    // result in an out of range.. segfault. Since this is used
+    // for efx_order[] array location.
+    m_process->OnOffC = 0;
+
+    m_process->lv2_join_thread();
+
+    m_process->Gui_Shown = 1;
+
+    Fl::add_timeout(.04, this->TimeoutStatic, this);
 #endif
 }

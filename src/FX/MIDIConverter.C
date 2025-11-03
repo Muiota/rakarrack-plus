@@ -11,11 +11,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+
+#ifndef nullptr
+// needed for c++98 with fltk > 1.3.9
+#define nullptr 0
+#endif
+
 #include "../global.h"
 
 #define M_PI 3.14159265358979323846
 #define MAX_FFT_LENGTH 48000
 #define MAX_PEAKS 8
+
+static pthread_mutex_t fftw_planner_lock = PTHREAD_MUTEX_INITIALIZER;
 
 MIDIConverter::MIDIConverter(char *jname, double sample_rate, uint32_t intermediate_bufsize):
     schmittBuffer(NULL),
@@ -53,11 +61,15 @@ MIDIConverter::MIDIConverter(char *jname, double sample_rate, uint32_t intermedi
     val_ir_sum(-50.0f),
     Pgain(64),
 #else
+#ifndef RKR_PLUS_LV2
     /* Jack */
     m_buffSize(NULL),
     m_buffMessage(NULL),
     /* Alsa */
     port(NULL),
+#else
+    plug(NULL),
+#endif
 #endif // LV2_SUPPORT
     Pmidi(),
     Poctave(),
@@ -78,14 +90,17 @@ MIDIConverter::MIDIConverter(char *jname, double sample_rate, uint32_t intermedi
     notes = englishNotes;
 
     schmittInit(32); // 32 == latency (tuneit default = 10)
+#ifndef RKR_PLUS_LV2
     fftInit(32); // == latency
+#endif
 
     char portname[50]; // used by alsa - put here to avoid unused variable compiler warning on jname
-    sprintf(portname, "%s MC OUT", jname); // used by alsa - put here to avoid unused variable compiler warning on jname
+    snprintf(portname, sizeof(portname), "%s MC OUT", jname); // used by alsa - put here to avoid unused variable compiler warning on jname
 
 #ifdef LV2_SUPPORT
     update_freqs(440.0f);
 #else
+#ifndef RKR_PLUS_LV2
     // Open Alsa Seq
     int err = snd_seq_open(&port, "default", SND_SEQ_OPEN_OUTPUT, 0);
 
@@ -101,18 +116,23 @@ MIDIConverter::MIDIConverter(char *jname, double sample_rate, uint32_t intermedi
                                SND_SEQ_PORT_CAP_SUBS_READ,
                                SND_SEQ_PORT_TYPE_APPLICATION);
 
+#endif // ifndef RKR_PLUS_LV2
 #endif // LV2_SUPPORT
 }
 
 MIDIConverter::~MIDIConverter()
 {
     schmittFree();
+#ifndef RKR_PLUS_LV2
     fftFree();
+#endif
 #ifndef LV2_SUPPORT
+#ifndef RKR_PLUS_LV2
     if(port)
     {
         snd_seq_close(port);
     }
+#endif
 #endif // LV2_SUPPORT
 }
 
@@ -168,7 +188,7 @@ MIDIConverter::cleanup()
     // nothing
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 MIDIConverter::lv2_update_params(uint32_t period)
 {
@@ -365,7 +385,9 @@ MIDIConverter::fftInit(int size)
     fftSize = 2 + (SAMPLE_RATE / size);
     fftIn = (float*) fftwf_malloc(sizeof (float) * 2 * (fftSize / 2 + 1));
     fftOut = (fftwf_complex *) fftIn;
+    pthread_mutex_lock (&fftw_planner_lock);
     fftPlan = fftwf_plan_dft_r2c_1d(fftSize, fftIn, fftOut, FFTW_MEASURE);
+    pthread_mutex_unlock (&fftw_planner_lock);
 
     fftSampleBuffer = (float *) malloc(fftSize * sizeof (float));
     fftSample = NULL;
@@ -506,7 +528,9 @@ MIDIConverter::fftS16LE(signed short int *indata, float val_sum, float *freqs, f
 void
 MIDIConverter::fftFree()
 {
+    pthread_mutex_lock (&fftw_planner_lock);
     fftwf_destroy_plan(fftPlan);
+    pthread_mutex_unlock (&fftw_planner_lock);
     fftwf_free(fftIn);
     free(fftSampleBuffer);
     free(fftLastPhase);
@@ -544,10 +568,10 @@ MIDIConverter::send_Midi_Note(uint nota, float val_sum, bool is_On)
     midi_Note_Message[1] = anota;
     midi_Note_Message[2] = velocity;
 
-#ifdef LV2_SUPPORT
-    forge_midimessage(plug, 0, midi_Note_Message, 3);
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
+    if(plug)
+        forge_midimessage(plug, 0, midi_Note_Message, 3);
 #else
-
     // ALSA
     snd_seq_event_t ev;
     snd_seq_ev_clear(&ev);
@@ -570,7 +594,7 @@ MIDIConverter::send_Midi_Note(uint nota, float val_sum, bool is_On)
                           nBytes);
     jack_ringbuffer_write(m_buffSize, (char *) &nBytes, sizeof ( nBytes));
 
-#endif // LV2_SUPPORT    
+#endif // LV2_SUPPORT || RKR_PLUS_LV2
 }
 
 #ifdef LV2_SUPPORT

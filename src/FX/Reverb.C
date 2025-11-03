@@ -99,8 +99,8 @@ Reverb::Reverb(double samplerate, uint16_t intermediate_bufsize) :
     tmp = lrintf(2.5 * samplerate);
     idelay = new float[tmp]; //set to max length
 
-    setpreset(Ppreset);
-    cleanup(); //do not call this before the comb initialisation
+    Reverb::setpreset(Ppreset);
+    Reverb::cleanup(); //do not call this before the comb initialisation
 }
 
 Reverb::~Reverb()
@@ -156,22 +156,15 @@ Reverb::cleanup()
     lpf->cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Reverb::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        clear_initialize();
-        initialize();
-        sethpf(Phpf);
-        setlpf(Plpf);
-    }
-    else
-    {
-        PERIOD = period;
-    }
+    PERIOD = period_master = period;
+    clear_initialize();
+    initialize();
+    sethpf(Phpf);
+    setlpf(Plpf);
 }
 #endif // LV2
 

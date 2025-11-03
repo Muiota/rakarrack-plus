@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "Echotron.h"
+#include "../strlcpy.h"
 
 Echotron::Echotron(double sample_rate, uint32_t intermediate_bufsize) :
     Effect(sample_rate, intermediate_bufsize),
@@ -79,7 +80,7 @@ Echotron::Echotron(double sample_rate, uint32_t intermediate_bufsize) :
     lpfr(NULL),
     interpbuf(NULL),
     filterbank()
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
     ,FILENAME(NULL)
 #endif // LV2
 {
@@ -96,7 +97,7 @@ Echotron::Echotron(double sample_rate, uint32_t intermediate_bufsize) :
 
     initialize();
 
-    setpreset(Ppreset);
+    Echotron::setpreset(Ppreset);
     init_params();
 }
 
@@ -125,28 +126,20 @@ Echotron::cleanup()
     lpfr->cleanup();
 }
 
-#ifdef LV2_SUPPORT
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
 void
 Echotron::lv2_update_params(uint32_t period)
 {
-    if (period > PERIOD) // only re-initialize if period > intermediate_bufsize of declaration
-    {
-        PERIOD = period;
-        fPERIOD = period;
-        clear_initialize();
-        initialize();
+    PERIOD = period_master = period;
+    fPERIOD = period;
+    clear_initialize();
+    initialize();
 
-        DlyFile filedata; // need to reload the file to reset the parameters
-        filedata = loadfile(FILENAME);
+    DlyFile filedata; // need to reload the file to reset the parameters
+    filedata = loadfile(FILENAME);
 
-        applyfile(filedata);
-        sethidamp(Phidamp); // set for the analog filter
-    }
-    else
-    {
-        PERIOD = period;
-        fPERIOD = period;
-    }
+    applyfile(filedata);
+    sethidamp(Phidamp); // set for the analog filter
 
     lfo->updateparams(fPERIOD);
     dlfo->updateparams(fPERIOD);
@@ -173,7 +166,7 @@ Echotron::set_random_parameters()
 
             case Echotron_Tempo:
             {
-                int value = (int) (RND * 600);
+                int value = (int) (RND * LFO_FREQ_MAX);
                 changepar (i, value + 1);
             }
             break;
@@ -195,7 +188,7 @@ Echotron::set_random_parameters()
 
             case Echotron_LFO_Type:
             {
-                int value = (int) (RND * 12);
+                int value = (int) (RND * LFO_NUM_TYPES);
                 changepar (i, value);
             }
             break;
@@ -517,7 +510,7 @@ Echotron::setfile(int value)
     {
         Filenum = value;
         memset(Filename, 0, sizeof (Filename));
-        sprintf(Filename, "%s/%d.dly", DATADIR, Filenum + 1);
+        snprintf(Filename, sizeof(Filename), "%s/%d.dly", DATADIR, Filenum + 1);
     }
 #ifndef LV2_SUPPORT // Rakarrack-plus only, user files must be in User Directory
     else
@@ -540,7 +533,7 @@ Echotron::setfile(int value)
                 // placed in the User Directory.
                 file_found = 1;
                 memset(Filename, 0, sizeof (Filename));
-                sprintf(Filename, "%s", DLY_Files[i].User_File_Name.c_str());
+                snprintf(Filename, sizeof(Filename), "%s", DLY_Files[i].User_File_Name.c_str());
                 break;
             }
         }
@@ -650,10 +643,10 @@ Echotron::check_delay_file_ranges(double value, int item)
 }
 
 DlyFile
-Echotron::loadfile(char* Filename)
+Echotron::loadfile(char* filename)
 {
-#ifdef LV2_SUPPORT
-    FILENAME = Filename; // For lv2 if need to re-initialize and reload file
+#if defined LV2_SUPPORT || defined RKR_PLUS_LV2
+    FILENAME = filename; // For lv2 if need to re-initialize and reload file
 #endif // LV2
     
     double tPan = 0.0f;
@@ -673,18 +666,18 @@ Echotron::loadfile(char* Filename)
 
     error = 0;
 
-    if ((fs = fopen(Filename, "r")) == NULL)
+    if ((fs = fopen(filename, "r")) == NULL)
     {
         error = Dly_Open;
 #ifndef LV2_SUPPORT
         global_error_number = error;
 #else
-        fprintf(stderr, "Echotron file open error #%d - %s\n", error, Filename);
+        fprintf(stderr, "Echotron file open error #%d - %s\n", error, filename);
 #endif
         return loaddefault();
     }
 
-    strcpy(f.Filename, Filename); // Must copy the file name here for lv2 save when if(plug->file_changed) in rkr.lv2.C
+    RKRP::strlcpy(f.Filename, filename, sizeof(f.Filename)); // Must copy the file name here for lv2 save when if(plug->file_changed) in rkr.lv2.C
 
     int first_line = 0;
     while (fgets(wbuf, sizeof wbuf, fs) != NULL)
@@ -768,7 +761,7 @@ Echotron::loadfile(char* Filename)
     if(error)
     {
 #ifdef LV2_SUPPORT
-    fprintf(stderr, "Echotron file loading error #%d - %s\n", error, Filename);
+    fprintf(stderr, "Echotron file loading error #%d - %s\n", error, filename);
 #endif
         return loaddefault();
     }    
@@ -788,7 +781,7 @@ Echotron::loaddefault()
 {
     Plength = 1;
     DlyFile f;
-    strcpy(f.Filename, "default");
+    RKRP::strlcpy(f.Filename, "default", sizeof(f.Filename));
     f.fLength = 1;
     f.fPan[0] = 0.0f;
     f.fTime[0] = 1.0f; //default 1 measure delay
